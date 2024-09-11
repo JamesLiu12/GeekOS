@@ -1,0 +1,11 @@
+# Submit server .submit file for
+#  Course CMSC412
+#  Project Project 0: Pipe
+
+courseName=CMSC412
+semester=202408
+projectNumber=Project 0
+courseKey=e36f4685caf73d6c
+authentication.type=cas
+baseURL=https://submit.cs.umd.edu:443/fall2024
+submitURL=https://submit.cs.umd.edu:443/fall2024/eclipse/SubmitProjectViaEclipse
