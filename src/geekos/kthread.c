@@ -645,6 +645,23 @@ struct Kernel_Thread *Start_User_Thread(struct User_Context *userContext,
     return kthread;
 }
 
+struct Kernel_Thread *Start_User_Thread_Fork(struct User_Context *userContext) {
+    struct Kernel_Thread *kthread = Create_Thread(PRIORITY_USER, 0);
+    if (kthread != 0) {
+        Setup_User_Thread(kthread, userContext);
+        kthread->esp = CURRENT_THREAD->esp - (ulong_t)CURRENT_THREAD->stackPage + (ulong_t)kthread->stackPage;
+
+        ulong_t stack_size = (ulong_t)kthread->stackPage + PAGE_SIZE - kthread->esp;
+        ulong_t *cur_stack = (ulong_t*)CURRENT_THREAD->stackPage + (PAGE_SIZE - stack_size) / sizeof(ulong_t);
+        ulong_t *new_stack = (ulong_t*)kthread->stackPage + (PAGE_SIZE - stack_size) / sizeof(ulong_t);
+        memcpy(new_stack, cur_stack, stack_size);
+        new_stack[10] = 0;
+        // memcpy(kthread->stackPage, CURRENT_THREAD->stackPage, stack_size);
+        Make_Runnable_Atomic(kthread);
+    }
+    return kthread;
+}
+
 /*
  * Get the thread that currently has the CPU.
  */
@@ -720,6 +737,37 @@ void Yield(void) {
 }
 
 
+void Close_Current_Thread() {
+    struct Kernel_Thread *result = 0;
+
+
+    bool iflag = Begin_Int_Atomic();
+
+    struct Kernel_Thread *current = get_current_thread(0);      /* interrupts disabled, may use fast */
+
+    /*
+     * TODO: we could remove the requirement that the caller
+     * needs to be the thread's owner by specifying that another
+     * reference is added to the thread before it is returned.
+     */
+
+    Spin_Lock(&kthreadLock);
+    result = Get_Front_Of_All_Thread_List(&s_allThreadList);
+    while (result != 0) {
+        if(result->pid == current->pid) {
+            if(current == result->owner) {
+                Detach_Thread(current);
+                Reap_Thread(current);
+            }
+            break;
+        }
+        result = Get_Next_In_All_Thread_List(result);
+    }
+    Spin_Unlock(&kthreadLock);
+
+    End_Int_Atomic(iflag);
+}
+
 /*
  * Exit the current thread.
  * Calling this function initiates a context switch.
@@ -753,6 +801,7 @@ void Exit(int exitCode) {
 
     /* Remove the thread's implicit reference to itself. */
     /* NOTE: may additionally schedule, if we are the last reference to ourselves */
+    // Close_Current_Thread();
     Detach_Thread(CURRENT_THREAD);
 
     /*

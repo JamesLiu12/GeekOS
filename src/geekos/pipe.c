@@ -38,6 +38,8 @@ int Pipe_Create(struct File **read_file, struct File **write_file) {
 
     *read_file = Allocate_File(&Pipe_Read_Ops, 0, 0, pipe, 0, 0);
     *write_file = Allocate_File(&Pipe_Write_Ops, 0, 0, pipe, 0, 0);
+    (*read_file)->refCount = 1;
+    (*write_file)->refCount = 1;
 
     return 0;
 }
@@ -58,33 +60,43 @@ int Pipe_Read(struct File *f, void *buf, ulong_t numBytes) {
 }
 
 int Pipe_Write(struct File *f, void *buf, ulong_t numBytes) {
+    ulong_t p;
     struct Pipe *pipe = (struct Pipe*)f->fsData;
+    char* dst = (char *)pipe->buffer;
+    char* src = (char *)buf;
 
-    if (!pipe->reader) return EPIPE;
-    if (PIPE_BUFFER_CAPACITY - pipe->buffer_size < numBytes) return 0;
+    if (pipe->reader == 0) {
+        return EPIPE;
+    }
+    if (numBytes + pipe->buffer_size > PIPE_BUFFER_CAPACITY) {
+        return ENOMEM;
+    }
 
-    memcpy(pipe->buffer + pipe->write_pos, buf, numBytes);
-    
-    pipe->write_pos += numBytes;
+    // Write to Pipe buffer
+    for (p = 0; p < numBytes; p++) {
+        dst[(pipe->write_pos + p) % PIPE_BUFFER_CAPACITY] = src[p];
+    }
+
     pipe->buffer_size += numBytes;
-    
+    pipe->write_pos = (pipe->write_pos + numBytes) % PIPE_BUFFER_CAPACITY;
     return numBytes;
 }
 
 int Pipe_Close(struct File *f) {
     struct Pipe *pipe = f->fsData;
 
-    if (!pipe) return 0;
-    f->fsData = NULL;
+    if (!pipe->reader || !pipe->writer) return 0;
     
-    if (f->ops->Read) {
-        pipe->reader--;
-        if (!pipe->reader) Free(pipe->buffer);
-    }
-    else if (f->ops->Write) {
-        pipe->writer--;
+    if (f->refCount == 0) {
+        if (f->ops->Read) {
+            pipe->reader--;
+            // if (!pipe->reader) Free(pipe->buffer);
+        }
+        else if (f->ops->Write) {
+            pipe->writer--;
+        }
     }
     
-    if (!pipe->reader && !pipe->writer) Free(pipe);
+    // if (!pipe->reader && !pipe->writer) Free(pipe);
     return 0;
 }

@@ -22,7 +22,14 @@ Mounted /c filesystem!
 Never gonna give you up!
 Welcome to GeekOS!
 Spawning init process (/c/shell.exe)
-$ pipe-p1
-$ pipe-p2
-$ pipe-p4
+$ exe[25;5f[25;4f[25;3f\
+Could not spawn process: No such file or directory
+$ fi[25;4f[25;3f
+$ forkexec
+waiting for  8
+I am the b program
+Arg 0 is b
+Arg 1 is program
+Arg 2 is argument
+The child exited 1
 $ 
