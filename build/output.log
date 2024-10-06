@@ -1,7 +1,7 @@
-BSS = 4c888
+BSS = 4e888
 start kern info = 90000
 Creating kernel heap: start=102000, size=1048576
-527232KB memory detected, 130362 pages in freelist, 1048576 bytes in kernel heap
+527232KB memory detected, 130360 pages in freelist, 1048576 bytes in kernel heap
 Initializing IDT...
 Init_SMP
 Initializing SMP...
@@ -22,14 +22,26 @@ Mounted /c filesystem!
 Never gonna give you up!
 Welcome to GeekOS!
 Spawning init process (/c/shell.exe)
-$ exe[25;5f[25;4f[25;3f\
-Could not spawn process: No such file or directory
-$ fi[25;4f[25;3f
-$ forkexec
-waiting for  8
-I am the b program
-Arg 0 is b
-Arg 1 is program
-Arg 2 is argument
-The child exited 1
+$ sigpipe
+Parent should handle sigpipe, child should terminate on sigpipe.
+original pid=7
+parent n=1, global=1, child_pid=8, my_pid=7
+child n=1, global=1, child_pid=0, my_pid=8
+Sending SIGPIPE 13
+Deque is empty, no front element.
+Sent Signal 6
+Recieved Signal 6
+pushBack 6
+Setup_Frame
+popFront 6
+Terminated 8
+expected to reap child_pid 8, Wait returned 0
+Sending SIGPIPE 13
+Deque is empty, no front element.
+Sent Signal 6
+Recieved Signal 6
+pushBack 6
+Setup_Frame
+popFront 6
+GOOD: sigpiped the parent!
 $ 

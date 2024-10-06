@@ -16,6 +16,10 @@
 #include <geekos/errno.h>
 #include <geekos/projects.h>
 #include <geekos/int.h>
+#include <geekos/smp.h>
+#include <geekos/signal.h>
+#include <geekos/user.h>
+#include <signal.h>
 
 
 const struct File_Ops Pipe_Read_Ops =
@@ -60,17 +64,21 @@ int Pipe_Read(struct File *f, void *buf, ulong_t numBytes) {
 }
 
 int Pipe_Write(struct File *f, void *buf, ulong_t numBytes) {
+    // Print("Pipe_Write\n");
     ulong_t p;
     struct Pipe *pipe = (struct Pipe*)f->fsData;
     char* dst = (char *)pipe->buffer;
     char* src = (char *)buf;
 
     if (pipe->reader == 0) {
+        Print("Sending SIGPIPE %d\n", SIGPIPE);
+        Send_Signal(CURRENT_THREAD, 6);
         return EPIPE;
     }
     if (numBytes + pipe->buffer_size > PIPE_BUFFER_CAPACITY) {
         return ENOMEM;
     }
+
 
     // Write to Pipe buffer
     for (p = 0; p < numBytes; p++) {

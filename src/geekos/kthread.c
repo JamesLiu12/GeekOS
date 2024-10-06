@@ -778,6 +778,17 @@ void Exit(int exitCode) {
     bool iflag;
     struct Kernel_Thread *current = CURRENT_THREAD;
 
+    if (!Interrupts_Enabled())
+        Enable_Interrupts();
+
+    if (current->owner != NULL && 
+            !Is_Member_Of_Thread_Queue(&current->joinQueue, current->owner) && 
+            current->userContext != NULL) {
+        Send_Signal(current->owner, SIGCHLD);
+    }
+
+    Notify_Children(current);
+
     /* ns14 old form disabled interrupts entirely; now narrower int_atomic sections. */
     KASSERT0(Interrupts_Enabled(),
              "believe exit should be called with interrupts enabled");
@@ -785,8 +796,6 @@ void Exit(int exitCode) {
     /* Thread is dead */
     current->exitCode = exitCode;
     current->alive = false;
-
-
 
     /* Remove timer references this thread has held */
     iflag = Begin_Int_Atomic(); /* seems less than necessary, but appeases. */
@@ -1051,4 +1060,39 @@ void Dump_All_Thread_List(void) {
 
     Spin_Unlock(&kthreadLock);
     Deprecated_End_Int_Atomic(iflag);
+}
+
+struct Kernel_Thread *Get_Zombie_Child(void) {
+    struct Kernel_Thread *zombieThread = NULL;
+    struct Kernel_Thread *currThread = Get_Front_Of_All_Thread_List(&s_allThreadList);
+
+    while (currThread != NULL) {
+        if (currThread->refCount == 1 && currThread->alive == false 
+                && currThread->owner == CURRENT_THREAD) {
+            zombieThread = currThread;
+            return zombieThread;
+        }
+        
+        currThread = Get_Next_In_All_Thread_List(currThread);
+    }
+
+    return zombieThread;
+}
+
+void Pub_Detach_Thread(struct Kernel_Thread *kthread) {
+    Detach_Thread(kthread);
+}
+
+void Notify_Children(struct Kernel_Thread *dying){
+    struct Kernel_Thread *curr = Get_Front_Of_All_Thread_List(&s_allThreadList);
+
+    while (curr != NULL){
+        if (curr->owner != 0) {
+            if (curr->owner->pid == dying->pid){
+                curr->owner = NULL;
+                curr->refCount--;
+            }
+        }
+        curr = Get_Next_In_All_Thread_List(curr);
+    }
 }

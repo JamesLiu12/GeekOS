@@ -413,8 +413,9 @@ int Close(struct File *file) {
     Mutex_Unlock(&s_vfsLock);
 
     rc = file->ops->Close(file);
-    if(rc == 0 && file->refCount == 0)
+    if(rc == 0 && file->refCount == 0 && file != NULL)
         Free(file);
+    
     return rc;
 }
 

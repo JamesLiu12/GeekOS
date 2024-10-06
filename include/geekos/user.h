@@ -47,6 +47,8 @@ struct File;
 /* Number of files user process can have open. */
 #define USER_MAX_FILES		10
 
+
+
 /*
  * A user mode context which can be attached to a Kernel_Thread,
  * to allow it to execute in user mode (ring 3).  This struct
@@ -102,9 +104,8 @@ struct User_Context {
     int refCount;
 
     char name[MAX_PROC_NAME_SZB];
-
-
-
+    
+    struct Process_Signals signals;
 
     mappedRegion_t *mappedRegions;
 };

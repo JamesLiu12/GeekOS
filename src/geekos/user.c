@@ -30,6 +30,7 @@
 #include <libc/string.h>
 #include <geekos/segment.h>
 #include <geekos/gdt.h>
+#include <geekos/signal.h>
 
 /*
  * This module contains common functions for implementation of user
@@ -127,6 +128,7 @@ int Spawn(const char *program, const char *command,
     strncpy(userContext->name, program, MAX_PROC_NAME_SZB);
     userContext->name[MAX_PROC_NAME_SZB - 1] = '\0';
 
+    initProcess_Signals(&userContext->signals);
 
     /* Start the process! */
     process = Start_User_Thread(userContext, background);

@@ -340,7 +340,19 @@ static int Sys_PS(struct Interrupt_State *state) {
  * Returns: 0 on success or error code (< 0) on error
  */
 static int Sys_Kill(struct Interrupt_State *state) {
-    TODO_P(PROJECT_SIGNALS, "Sys_Kill system call");
+    // TODO_P(PROJECT_SIGNALS, "Sys_Kill system call");
+    int pid = state->ebx;
+    int signalNum = state->ecx;
+    if (!IS_SIGNUM(signalNum)) return EINVALID;
+    
+    struct Kernel_Thread *kthread = Lookup_Thread(pid, 1);
+
+    if (kthread == NULL) return EINVALID;
+
+    if (kthread->userContext == NULL) return EINVALID;
+
+    Send_Signal(kthread, signalNum);
+
     return 0;
 }
 
@@ -352,7 +364,16 @@ static int Sys_Kill(struct Interrupt_State *state) {
  * Returns: 0 on success or error code (< 0) on error
  */
 static int Sys_Signal(struct Interrupt_State *state) {
-    TODO_P(PROJECT_SIGNALS, "Sys_Signal system call");
+    // TODO_P(PROJECT_SIGNALS, "Sys_Signal system call");
+    signal_handler handler = (signal_handler) state->ebx;
+    int signal_num = state->ecx;
+
+    if (signal_num == SIGKILL) return EINVALID;
+    if (!IS_SIGNUM(signal_num)) return EINVALID;
+
+    // Register the handler for the signal
+    CURRENT_THREAD->userContext->signals.handlers[signal_num] = handler;
+
     return 0;
 }
 
@@ -368,8 +389,34 @@ static int Sys_Signal(struct Interrupt_State *state) {
  * Returns: 0 on success or error code (< 0) on error
  */
 static int Sys_RegDeliver(struct Interrupt_State *state) {
+    // TODO_P(PROJECT_SIGNALS, "Sys_RegDeliver system call");
+    // struct User_Context *userContext = CURRENT_THREAD->userContext;
+
+    // void *trampolineAddr = (void *)state->ebx;
+
+    // if (userContext == NULL) return EINVALID;
+
+    // userContext->signals.returnSignal = trampolineAddr;
+    CURRENT_THREAD->userContext->signals.returnSignal = (void *)state->ebx;
+
     return 0;
-    TODO_P(PROJECT_SIGNALS, "Sys_RegDeliver system call");
+}
+
+void Restore_Original_State(struct Kernel_Thread *kthread, struct Interrupt_State *state) {
+    // state->gs = kthread->userContext->signals.saved_gs;
+    // state->fs = kthread->userContext->signals.saved_fs;
+    // state->es = kthread->userContext->signals.saved_es;
+    // state->ds = kthread->userContext->signals.saved_ds;
+    // state->ebp = kthread->userContext->signals.saved_ebp;
+    // state->edi = kthread->userContext->signals.saved_edi;
+    // state->esi = kthread->userContext->signals.saved_esi;
+    // state->edx = kthread->userContext->signals.saved_edx;
+    // state->ecx = kthread->userContext->signals.saved_ecx;
+    // state->ebx = kthread->userContext->signals.saved_ebx;
+    // state->eax = kthread->userContext->signals.saved_eax;
+    // state->eip = kthread->userContext->signals.saved_eip;
+    // state->cs = kthread->userContext->signals.saved_cs;
+    // state->eflags = kthread->userContext->signals.saved_eflags;
 }
 
 /*
@@ -379,9 +426,13 @@ static int Sys_RegDeliver(struct Interrupt_State *state) {
  *
  * Returns: not expected to "return"
  */
-static int Sys_ReturnSignal(struct Interrupt_State *state) {
-    TODO_P(PROJECT_SIGNALS, "Sys_ReturnSignal system call");
-    return EUNSUPPORTED;
+static int Sys_ReturnSignal(struct Interrupt_State *state) {    
+    
+    // Restore_Original_State(CURRENT_THREAD, state);
+    // CURRENT_THREAD->userContext->signals.currentSignal = 0;
+    Complete_Handler(CURRENT_THREAD, state);
+    
+    return state->eax;
 }
 
 /*
@@ -392,8 +443,22 @@ static int Sys_ReturnSignal(struct Interrupt_State *state) {
  */
 static int Sys_WaitNoPID(struct Interrupt_State *state) {
     /* not required for Spring 2017 */
-    TODO_P(PROJECT_SIGNALS, "Sys_WaitNoPID system call");
-    return EUNSUPPORTED;
+    // TODO_P(PROJECT_SIGNALS, "Sys_WaitNoPID system call");
+    struct Kernel_Thread *zombieThread = Get_Zombie_Child(); 
+    int zombiepid;
+    if (zombieThread == NULL) 
+        return ENOZOMBIES;
+
+    zombiepid = zombieThread->pid; // Save zombie pid
+    // Copy exit code to user variable
+    if(!Copy_To_User(state->ebx, &zombieThread->exitCode, sizeof(int)))
+        return EUNSPECIFIED;
+     
+    // Detach zombie thread, which sends to reaper
+    Pub_Detach_Thread(zombieThread);
+
+    return zombiepid;
+    // return EUNSUPPORTED;
 }
 
 /*
@@ -935,6 +1000,11 @@ static int Sys_Fork(struct Interrupt_State *state) {
     new_context->entryAddr = cur_context->entryAddr;
     new_context->argBlockAddr = cur_context->argBlockAddr;
     new_context->stackPointerAddr = cur_context->stackPointerAddr;
+
+    for (i = 0; i < MAXSIG; i++) {
+        new_context->signals.handlers[i] = cur_context->signals.handlers[i];
+    }
+    new_context->signals.returnSignal = cur_context->signals.returnSignal;
 
     struct Kernel_Thread *new_thread = Start_User_Thread_Fork(new_context);
     return new_thread == 0 ? ENOMEM : new_thread->pid;

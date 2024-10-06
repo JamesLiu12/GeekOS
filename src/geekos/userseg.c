@@ -26,6 +26,7 @@
 #include <geekos/argblock.h>
 #include <geekos/user.h>
 #include <geekos/smp.h>
+#include <geekos/signal.h>
 
 /* ----------------------------------------------------------------------
  * Variables
@@ -102,6 +103,7 @@ extern struct User_Context *Create_User_Context(ulong_t size) {
     /* Nobody is using this user context yet */
     context->refCount = 0;
 
+    initProcess_Signals(&context->signals);
 
     /* Success! */
     return context;
