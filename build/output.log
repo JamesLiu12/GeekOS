@@ -22,26 +22,21 @@ Mounted /c filesystem!
 Never gonna give you up!
 Welcome to GeekOS!
 Spawning init process (/c/shell.exe)
+In Sys_RegDeliver
 $ sigpipe
+In Sys_RegDeliver
 Parent should handle sigpipe, child should terminate on sigpipe.
 original pid=7
 parent n=1, global=1, child_pid=8, my_pid=7
+In Sys_Signal, Trying to register signal number: 6
 child n=1, global=1, child_pid=0, my_pid=8
-Sending SIGPIPE 13
-Deque is empty, no front element.
-Sent Signal 6
-Recieved Signal 6
-pushBack 6
-Setup_Frame
-popFront 6
+In Setup_Frame. Find pending signal: 6
 Terminated 8
-expected to reap child_pid 8, Wait returned 0
-Sending SIGPIPE 13
-Deque is empty, no front element.
-Sent Signal 6
-Recieved Signal 6
-pushBack 6
-Setup_Frame
-popFront 6
+In Setup_Frame. Find pending signal: 4
+expected to reap child_pid 8, Wait returned 262
+In Setup_Frame. Find pending signal: 6
 GOOD: sigpiped the parent!
+In Sys_ReturnSignal
+In Complete_Handler
+In Setup_Frame. Find pending signal: 4
 $ 

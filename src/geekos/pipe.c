@@ -71,7 +71,7 @@ int Pipe_Write(struct File *f, void *buf, ulong_t numBytes) {
     char* src = (char *)buf;
 
     if (pipe->reader == 0) {
-        Print("Sending SIGPIPE %d\n", SIGPIPE);
+        // Print("Sending SIGPIPE %d\n", SIGPIPE);
         Send_Signal(CURRENT_THREAD, 6);
         return EPIPE;
     }

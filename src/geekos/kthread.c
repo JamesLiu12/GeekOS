@@ -782,8 +782,7 @@ void Exit(int exitCode) {
         Enable_Interrupts();
 
     if (current->owner != NULL && 
-            !Is_Member_Of_Thread_Queue(&current->joinQueue, current->owner) && 
-            current->userContext != NULL) {
+        !Is_Member_Of_Thread_Queue(&current->joinQueue, current->owner)) {
         Send_Signal(current->owner, SIGCHLD);
     }
 
@@ -1063,36 +1062,28 @@ void Dump_All_Thread_List(void) {
 }
 
 struct Kernel_Thread *Get_Zombie_Child(void) {
-    struct Kernel_Thread *zombieThread = NULL;
-    struct Kernel_Thread *currThread = Get_Front_Of_All_Thread_List(&s_allThreadList);
+    struct Kernel_Thread *combie = NULL;
+    struct Kernel_Thread *cur = Get_Front_Of_All_Thread_List(&s_allThreadList);
 
-    while (currThread != NULL) {
-        if (currThread->refCount == 1 && currThread->alive == false 
-                && currThread->owner == CURRENT_THREAD) {
-            zombieThread = currThread;
-            return zombieThread;
+    while (cur != NULL) {
+        if (cur->refCount == 1 && !cur->alive && cur->owner == CURRENT_THREAD) {
+            return cur;
         }
-        
-        currThread = Get_Next_In_All_Thread_List(currThread);
+        cur = Get_Next_In_All_Thread_List(cur);
     }
 
-    return zombieThread;
+    return combie;
 }
 
-void Pub_Detach_Thread(struct Kernel_Thread *kthread) {
-    Detach_Thread(kthread);
-}
+void Notify_Children(struct Kernel_Thread *deadThread){
+    struct Kernel_Thread *cur = Get_Front_Of_All_Thread_List(&s_allThreadList);
 
-void Notify_Children(struct Kernel_Thread *dying){
-    struct Kernel_Thread *curr = Get_Front_Of_All_Thread_List(&s_allThreadList);
-
-    while (curr != NULL){
-        if (curr->owner != 0) {
-            if (curr->owner->pid == dying->pid){
-                curr->owner = NULL;
-                curr->refCount--;
-            }
+    while (cur != NULL) {
+        if (cur->owner && cur->owner->pid == deadThread->pid) {
+            cur->owner = NULL;
+            cur->refCount--;
         }
-        curr = Get_Next_In_All_Thread_List(curr);
+        cur = Get_Next_In_All_Thread_List(cur);
     }
+
 }

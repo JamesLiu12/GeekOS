@@ -52,7 +52,7 @@ int isEmpty(struct Signal_Deque* deque) {
     return (deque->head == NULL);
 }
 void pushFront(struct Signal_Deque* deque, int signalNum) {
-    Print("pushFront\n");
+    // Print("pushFront\n");
     struct Signal_Node *newNode = (struct Signal_Node*)Malloc(sizeof(struct Signal_Node));
     newNode->signalNum = signalNum;
     newNode->next = deque->head;
@@ -66,7 +66,7 @@ void pushFront(struct Signal_Deque* deque, int signalNum) {
     deque->head = newNode;
 }
 void pushBack(struct Signal_Deque* deque, int signalNum) {
-    Print("pushBack %d\n", signalNum);
+    // Print("pushBack %d\n", signalNum);
     struct Signal_Node *newNode = (struct Signal_Node*)Malloc(sizeof(struct Signal_Node));
     newNode->signalNum = signalNum;
     newNode->next = NULL;
@@ -81,7 +81,7 @@ void pushBack(struct Signal_Deque* deque, int signalNum) {
     deque->tail = newNode;
 }
 int popFront(struct Signal_Deque* deque) {
-    Print("popFront %d\n", deque->head->signalNum);
+    // Print("popFront %d\n", deque->head->signalNum);
     if (isEmpty(deque)) {
         Print("Deque is empty, nothing to pop from the front.\n");
         return;
@@ -101,7 +101,7 @@ int popFront(struct Signal_Deque* deque) {
     return res;
 }
 int popBack(struct Signal_Deque* deque) {
-    Print("popBack\n");
+    // Print("popBack\n");
     if (isEmpty(deque)) {
         Print("Deque is empty, nothing to pop from the rear.\n");
         while (1);
@@ -123,21 +123,21 @@ int popBack(struct Signal_Deque* deque) {
 }
 int getFrontNode(struct Signal_Deque* deque) {
     if (isEmpty(deque)) {
-        Print("Deque is empty, no front element.\n");
+        // Print("Deque is empty, no front element.\n");
         return -1;
     }
     return deque->head;
 }
 int getBackNode(struct Signal_Deque* deque) {
     if (isEmpty(deque)) {
-        Print("Deque is empty, no rear element.\n");
+        // Print("Deque is empty, no rear element.\n");
         return -1;
     }
     return deque->tail;
 }
 int getNextNode(struct Signal_Node* node) {
     if (node == NULL) {
-        Print("Node is NULL, no next element.\n");
+        // Print("Node is NULL, no next element.\n");
         return -1;
     }
     return node->next;
@@ -151,15 +151,17 @@ void Complete_Handler(struct Kernel_Thread *kthread,
     KASSERT(state);
     // TODO_P(PROJECT_SIGNALS,
     //        "Complete_Handler cleans up after a signal handler");
+    Print("In Complete_Handler\n");
 
-    struct User_Interrupt_State *userState = (struct User_Interrupt_State *) state;
+    struct User_Interrupt_State *userState = (struct User_Interrupt_State *)state;
 
     kthread->userContext->signals.handlingSignal = 0;
-    
-    // userState->espUser += sizeof(signal_handler);
+
     userState->espUser += sizeof(int);
-    if(!Copy_From_User(state, userState->espUser, sizeof(struct Interrupt_State))) return EUNSPECIFIED;
-    
+
+    if (!Copy_From_User(state, userState->espUser, sizeof(struct Interrupt_State))) 
+        return EUNSPECIFIED;
+
     userState->espUser += sizeof(struct Interrupt_State);
 }
 
@@ -168,43 +170,37 @@ int Check_Pending_Signal(struct Kernel_Thread *kthread,
     KASSERT(kthread);
     KASSERT(state);
 
-    // if (kthread->userContext->signals.pendingSignal == 0) return 0;
-    // if (state->cs == KERNEL_CS) return 0;
-    // if (kthread->userContext->signals.currentSignal != 0) return 0;
-    // return 1;
-
-    if (kthread->userContext->signals.pendingSignal && (state->cs != KERNEL_CS) && !kthread->userContext->signals.handlingSignal) {
-        return 1;
+    if (kthread->userContext->signals.pendingSignal == 0 || 
+        state->cs == KERNEL_CS || 
+        kthread->userContext->signals.handlingSignal != 0) {
+        return 0;
     }
 
-    return 0;
+    return 1;
+
 }
 
 void Send_Signal(struct Kernel_Thread *kthread, int signum) {
-    struct Signal_Node *currSig = getFrontNode(
-                                        &kthread->userContext->signals.sigQueue);
+    // struct Signal_Node *currSig = getFrontNode(
+    //                                     &kthread->userContext->signals.sigQueue);
                                         
-    Print("Sent Signal %d\n", signum);
+    // Print("Sent Signal %d\n", signum);
     
-    /* Checks for duplicates in the signal queue */
-    while (currSig != 0) {
-        if (currSig->signalNum == signum){
-            return;
-        }
+    // while (currSig != 0) {
+    //     if (currSig->signalNum == signum){
+    //         return;
+    //     }
         
-        currSig = getNextNode(currSig);
-    }
+    //     currSig = getNextNode(currSig);
+    // }
 
-    Print("Recieved Signal %d\n", signum);
+    // Print("Recieved Signal %d\n", signum);
 
-    /* Set the thread's signal pending flag */
     kthread->userContext->signals.pendingSignal = 1;
     
-    /* If signal is SIGKILL then add to front of queue */
     if (signum == SIGKILL) {
         pushFront(&kthread->userContext->signals.sigQueue, signum);
     }
-    /* Else just add to back of queue */
     else {
         pushBack(&kthread->userContext->signals.sigQueue, signum);
     }
@@ -250,96 +246,41 @@ void Setup_Frame(struct Kernel_Thread *kthread,
     KASSERT(kthread);
     KASSERT(state);
 
-    // int signalNum = kthread->userContext->signals.pendingSignal;
-    // void *signalHandler = kthread->userContext->signals.handlers[signalNum];
-
-    // if (signalHandler == SIG_IGN) {
-    //     return;
-    // }
-
-    // if (signalHandler == SIG_DFL) {
-    //     if (signalNum == SIGKILL) {
-    //         Exit(kthread);
-    //     }
-    //     return;
-    // }
-
-    // uint_t *userStack = (uint_t *)kthread->esp;
-
-    // *(--userStack) = state->eflags;
-    // *(--userStack) = state->cs;
-    // *(--userStack) = state->eip;
-
-    // *(--userStack) = state->errorCode;
-
-    // *(--userStack) = state->intNum;
-
-    // *(--userStack) = state->eax;
-    // *(--userStack) = state->ebx;
-    // *(--userStack) = state->ecx;
-    // *(--userStack) = state->edx;
-    // *(--userStack) = state->esi;
-    // *(--userStack) = state->edi;
-    // *(--userStack) = state->ebp;
-
-    // *(--userStack) = state->ds;
-    // *(--userStack) = state->es;
-    // *(--userStack) = state->fs;
-    // *(--userStack) = state->gs;
-
-    // *(--userStack) = signalNum;
-    
-    // *(--userStack) = (uint_t)kthread->userContext->signals.returnSignal;
-
-    // kthread->esp = (uint_t)userStack;
-
-    // state->eip = (uint_t)signalHandler;
-
-    Print("Setup_Frame\n");	
 
     kthread->userContext->signals.handlingSignal = 1;
-    
-    struct User_Interrupt_State *user = (struct User_Interrupt_State *) state;
+
+    struct User_Interrupt_State *user = (struct User_Interrupt_State *)state;
     int signum = popFront(&kthread->userContext->signals.sigQueue);
     signal_handler sigHand = kthread->userContext->signals.handlers[signum];
-    
-    /* Checks if there are any more signals in the signal_queue */
+
+    Print("In Setup_Frame. Find pending signal: %d\n", signum);
+
     if (isEmpty(&kthread->userContext->signals.sigQueue))
         kthread->userContext->signals.pendingSignal = 0;
 
-    /* Return if signal_handler is SIG_IGN */
+
     if (sigHand == SIG_IGN) {
         kthread->userContext->signals.handlingSignal = 0;
         return;
-    } 
-    /* Handle if signal_handler is SIG_DFL */ 
-    else if (sigHand == SIG_DFL) {
+    } else if (sigHand == SIG_DFL) {
         kthread->userContext->signals.handlingSignal = 0;
-        if (signum == SIGCHLD) { 
-            return;
-        }
-        
+        if (signum == SIGCHLD) return;
         Print("Terminated %d\n", CURRENT_THREAD->pid);
-        Exit(0);
-    } 
-    /* Else set up the user and kernel stack */ 
-    else {
-        /* Push interrupt_state onto user stack */
-        user->espUser -= sizeof(struct Interrupt_State); 
-        if(!Copy_To_User(user->espUser, state, sizeof(struct Interrupt_State)))
-            return EUNSPECIFIED;
-         
-        /* Push the signal number onto user stack */
-        user->espUser -= sizeof(int); 
-        if(!Copy_To_User(user->espUser, &signum, sizeof(int)))
-            return EUNSPECIFIED;
-           
-        /* Push the signal trampoline onto user stack */
-        user->espUser -= sizeof(signal_handler);
-        if(!Copy_To_User(user->espUser, &kthread->userContext->signals.returnSignal, sizeof(signal_handler)))
+        Exit(262);
+    } else {
+        user->espUser -= sizeof(struct Interrupt_State);
+        if (!Copy_To_User(user->espUser, state, sizeof(struct Interrupt_State))) 
             return EUNSPECIFIED;
         
-        /* Change the kernel stack */
+        user->espUser -= sizeof(int);
+        if (!Copy_To_User(user->espUser, &signum, sizeof(int))) 
+            return EUNSPECIFIED;
+        
+        user->espUser -= sizeof(signal_handler);
+        if (!Copy_To_User(user->espUser, &kthread->userContext->signals.returnSignal, sizeof(signal_handler))) 
+            return EUNSPECIFIED;
+
         state->eip = sigHand;
     }
+
 }

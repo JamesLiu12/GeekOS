@@ -50,20 +50,6 @@ struct Process_Signals {
     int handlingSignal;
     signal_handler returnSignal;
     int pendingSignal;
-    // int saved_gs;
-    // int saved_fs;
-    // int saved_es;
-    // int saved_ds;
-    // int saved_ebp;
-    // int saved_edi;
-    // int saved_esi;
-    // int saved_edx;
-    // int saved_ecx;
-    // int saved_ebx;
-    // int saved_eax;
-    // int saved_eip;
-    // int saved_cs;
-    // int saved_eflags;
     struct Signal_Deque sigQueue;
 };
 

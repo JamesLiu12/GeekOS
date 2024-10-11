@@ -191,6 +191,6 @@ extern void Dump_All_Thread_List(void);
 
 extern void Wake_Up_Locked(struct Thread_Queue *waitQueue);
 
-void Pub_Detach_Thread(struct Kernel_Thread *kthread);
+void Detach_Thread(struct Kernel_Thread *kthread);
 
 #endif /* GEEKOS_KTHREAD_H */

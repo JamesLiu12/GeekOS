@@ -368,10 +368,11 @@ static int Sys_Signal(struct Interrupt_State *state) {
     signal_handler handler = (signal_handler) state->ebx;
     int signal_num = state->ecx;
 
+    Print("In Sys_Signal, Trying to register signal number: %d\n", signal_num);
+
     if (signal_num == SIGKILL) return EINVALID;
     if (!IS_SIGNUM(signal_num)) return EINVALID;
 
-    // Register the handler for the signal
     CURRENT_THREAD->userContext->signals.handlers[signal_num] = handler;
 
     return 0;
@@ -397,26 +398,10 @@ static int Sys_RegDeliver(struct Interrupt_State *state) {
     // if (userContext == NULL) return EINVALID;
 
     // userContext->signals.returnSignal = trampolineAddr;
+    Print("In Sys_RegDeliver\n");
     CURRENT_THREAD->userContext->signals.returnSignal = (void *)state->ebx;
 
     return 0;
-}
-
-void Restore_Original_State(struct Kernel_Thread *kthread, struct Interrupt_State *state) {
-    // state->gs = kthread->userContext->signals.saved_gs;
-    // state->fs = kthread->userContext->signals.saved_fs;
-    // state->es = kthread->userContext->signals.saved_es;
-    // state->ds = kthread->userContext->signals.saved_ds;
-    // state->ebp = kthread->userContext->signals.saved_ebp;
-    // state->edi = kthread->userContext->signals.saved_edi;
-    // state->esi = kthread->userContext->signals.saved_esi;
-    // state->edx = kthread->userContext->signals.saved_edx;
-    // state->ecx = kthread->userContext->signals.saved_ecx;
-    // state->ebx = kthread->userContext->signals.saved_ebx;
-    // state->eax = kthread->userContext->signals.saved_eax;
-    // state->eip = kthread->userContext->signals.saved_eip;
-    // state->cs = kthread->userContext->signals.saved_cs;
-    // state->eflags = kthread->userContext->signals.saved_eflags;
 }
 
 /*
@@ -430,6 +415,7 @@ static int Sys_ReturnSignal(struct Interrupt_State *state) {
     
     // Restore_Original_State(CURRENT_THREAD, state);
     // CURRENT_THREAD->userContext->signals.currentSignal = 0;
+    Print("In Sys_ReturnSignal\n");	
     Complete_Handler(CURRENT_THREAD, state);
     
     return state->eax;
@@ -444,18 +430,18 @@ static int Sys_ReturnSignal(struct Interrupt_State *state) {
 static int Sys_WaitNoPID(struct Interrupt_State *state) {
     /* not required for Spring 2017 */
     // TODO_P(PROJECT_SIGNALS, "Sys_WaitNoPID system call");
-    struct Kernel_Thread *zombieThread = Get_Zombie_Child(); 
-    int zombiepid;
+    // Print("In Sys_WaitNoPID\n");
+    struct Kernel_Thread *zombieThread = Get_Zombie_Child();
     if (zombieThread == NULL) 
         return ENOZOMBIES;
 
-    zombiepid = zombieThread->pid; // Save zombie pid
+    int zombiepid = zombieThread->pid; // Save zombie pid
+
     // Copy exit code to user variable
-    if(!Copy_To_User(state->ebx, &zombieThread->exitCode, sizeof(int)))
+    if (!Copy_To_User(state->ebx, &zombieThread->exitCode, sizeof(int))) 
         return EUNSPECIFIED;
-     
-    // Detach zombie thread, which sends to reaper
-    Pub_Detach_Thread(zombieThread);
+
+    Detach_Thread(zombieThread);
 
     return zombiepid;
     // return EUNSUPPORTED;
