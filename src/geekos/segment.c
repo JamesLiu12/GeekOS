@@ -76,6 +76,22 @@ void Init_Code_Segment_Descriptor(struct Segment_Descriptor *desc,
     desc->dbBit = 1;            /* 32 bit code segment */
 }
 
+void Init_PerCPU_Segment_Descriptor(struct Segment_Descriptor *desc, 
+                                    ulong_t baseAddr, 
+                                    ulong_t numBytes, 
+                                    int privilegeLevel) {
+    KASSERT(privilegeLevel >= 0 && privilegeLevel <= 3);
+
+    Set_Size_And_Base_Bytes(desc, baseAddr, numBytes);
+    desc->type = 0x02;
+    desc->system = 1;
+    desc->dpl = privilegeLevel;
+    desc->present = 1;
+    desc->reserved = 0;
+    desc->dbBit = 1;
+    desc->granularity = 0;
+}
+
 /*
  * Initialize a data segment descriptor.
  */

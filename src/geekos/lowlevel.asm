@@ -140,6 +140,8 @@ IMPORT unlockKernel
 IMPORT lockKernel
 IMPORT kthreadLock              ; to avoid preemption when the kthread spinlock is held.
 
+IMPORT Test_Output
+
 ; This symbol is defined in idt.c, and is a table of addresses
 ; of C handler functions for interrupts.
 IMPORT g_interruptTable
@@ -235,8 +237,9 @@ Load_GDTR:
     mov	ds, ax
     mov	es, ax
     mov	fs, ax
-    mov	gs, ax
     mov	ss, ax
+    mov ax, KERNEL_GS
+    mov	gs, ax
     jmp	KERNEL_CS:.here
 .here:
     ret
@@ -314,18 +317,18 @@ APIC_ID		equ	0x20
 %endmacro 
 
 ;; eax = *( &g_currentThreads[Get_CPU_ID()] )
-%macro Get_Current_Thread_To_EAX 0
-    Mov_EAX_Current_Thread_PTR
-    mov	eax, [eax]              
-%endmacro
-%macro Set_Current_Thread_From_EBX 0
-    Mov_EAX_Current_Thread_PTR
-    mov	[eax], ebx
-%endmacro
-%macro Push_Current_Thread_PTR 0
-    Mov_EAX_Current_Thread_PTR
-    push	dword [eax]
-%endmacro
+; %macro Get_Current_Thread_To_EAX 0
+;     Mov_EAX_Current_Thread_PTR
+;     mov	eax, [eax]              
+; %endmacro
+; %macro Set_Current_Thread_From_EBX 0
+;     Mov_EAX_Current_Thread_PTR
+;     mov	[eax], ebx
+; %endmacro
+; %macro Push_Current_Thread_PTR 0
+;     Mov_EAX_Current_Thread_PTR
+;     push	dword [eax]
+; %endmacro
 
 %include "percpu.asm"
 
@@ -343,6 +346,9 @@ Handle_Interrupt:
     mov	ax, KERNEL_DS
     mov	ds, ax
     mov	es, ax
+
+    mov ax, KERNEL_GS
+    mov gs, ax
 
     ; Get the address of the C handler function from the
     ; table of handler functions.
@@ -464,7 +470,6 @@ Switch_To_Thread:
     ;            eflags
     ;            cs
     ;    esp --> return addr
-
     push	eax		; save eax
     mov	eax, [esp+4]	; get return address
     mov	[esp-4], eax	; move return addr down 8 bytes from orig loc

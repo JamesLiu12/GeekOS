@@ -33,6 +33,7 @@
 #include <geekos/pipe.h>
 #include <geekos/mem.h>
 #include <geekos/smp.h>
+#include <geekos/gdt.h>
 
 extern Spin_Lock_t kthreadLock;
 
@@ -962,6 +963,10 @@ static int Sys_Pipe(struct Interrupt_State *state) {
 static int Sys_Fork(struct Interrupt_State *state) {
     struct User_Context *cur_context = CURRENT_THREAD->userContext;
     struct User_Context *new_context = (struct User_Context *)Malloc(sizeof(struct User_Context));
+    if (new_context == NULL) {
+        return ENOMEM;
+    }
+
     memcpy(new_context, cur_context, sizeof(struct User_Context));
 
     int i;
@@ -970,8 +975,24 @@ static int Sys_Fork(struct Interrupt_State *state) {
         if (file) file->refCount++;
     }
 
-    new_context->ldtDescriptor = Allocate_Segment_Descriptor();
-    Init_LDT_Descriptor(new_context->ldtDescriptor, new_context->ldt, NUM_USER_LDT_ENTRIES);
+    int cpu;
+    for (cpu = 0; cpu < CPU_Count; cpu++) {
+        new_context->ldtDescriptor[cpu] = Allocate_Segment_Descriptor_On_CPU(cpu);
+        if (new_context->ldtDescriptor[cpu] == NULL) {
+            // Free already allocated resources if descriptor allocation fails
+            int j;
+            for (j = 0; j < cpu; j++) {
+                Free_Segment_Descriptor(new_context->ldtDescriptor[j]);
+            }
+            Free(new_context);
+            return ENOMEM;
+        }
+
+        Init_LDT_Descriptor(new_context->ldtDescriptor[cpu], new_context->ldt, NUM_USER_LDT_ENTRIES);
+    }
+
+    // new_context->ldtDescriptor = Allocate_Segment_Descriptor();
+    // Init_LDT_Descriptor(new_context->ldtDescriptor, new_context->ldt, NUM_USER_LDT_ENTRIES);
 
     new_context->memory = (char *)Malloc(new_context->size);
     memcpy(new_context->memory, cur_context->memory, new_context->size);

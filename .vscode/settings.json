@@ -4,6 +4,7 @@
         "kthread.h": "c",
         "syscall.h": "c",
         "signal.h": "c",
-        "projects.h": "c"
+        "projects.h": "c",
+        "percpu.h": "c"
     }
 }

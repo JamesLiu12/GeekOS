@@ -26,6 +26,7 @@
 #include <geekos/projects.h>
 #include <geekos/smp.h>
 #include <geekos/synch.h>
+#include <geekos/percpu.h>
 
 extern Spin_Lock_t kthreadLock;
 
@@ -366,8 +367,9 @@ static void Setup_Kernel_Thread(struct Kernel_Thread *kthread,
     Push(kthread, KERNEL_DS);   /* ds */
     Push(kthread, KERNEL_DS);   /* es */
     Push(kthread, 0);           /* fs */
-    Push(kthread, 0);           /* gs */
-    TODO_P(PROJECT_PERCPU, "set gs to the per-cpu segment");
+    // Push(kthread, 0);           /* gs */
+    // TODO_P(PROJECT_PERCPU, "set gs to the per-cpu segment");
+    Push(kthread, KERNEL_GS);
 }
 
 /*
@@ -566,7 +568,8 @@ void Init_Scheduler(unsigned int cpuID, void *stack) {
      */
     Init_Thread(mainThread, stack, PRIORITY_NORMAL, true);
     g_currentThreads[Get_CPU_ID()] = mainThread;
-    TODO_P(PROJECT_PERCPU, "set the current thread now that we have one");
+    // TODO_P(PROJECT_PERCPU, "set the current thread now that we have one");
+    percpu_data[cpuID].current_thread = mainThread;
     Add_To_Back_Of_All_Thread_List(&s_allThreadList, mainThread);
     strcpy(mainThread->threadName, "{Main}");
 
@@ -584,6 +587,7 @@ void Init_Scheduler(unsigned int cpuID, void *stack) {
 
     TODO_P(PROJECT_PERCPU_SCHED,
            "set the idle thread now that we have one");
+    // percpu_data[cpuID].idle_thread = CPUs[cpuID].idleThread;
 
     if(!cpuID) {
         /*
@@ -719,7 +723,7 @@ void Schedule_And_Unlock(Spin_Lock_t * unlock_me) {
     runnable = Get_Next_Runnable();
 
     Spin_Unlock(unlock_me);
-
+    
     Switch_To_Thread(runnable);
 }
 

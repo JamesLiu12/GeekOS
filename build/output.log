@@ -1,7 +1,7 @@
-BSS = 4e888
+BSS = 4f088
 start kern info = 90000
 Creating kernel heap: start=102000, size=1048576
-527232KB memory detected, 130360 pages in freelist, 1048576 bytes in kernel heap
+527232KB memory detected, 130359 pages in freelist, 1048576 bytes in kernel heap
 Initializing IDT...
 Init_SMP
 Initializing SMP...
@@ -23,20 +23,4 @@ Never gonna give you up!
 Welcome to GeekOS!
 Spawning init process (/c/shell.exe)
 In Sys_RegDeliver
-$ sigpipe
-In Sys_RegDeliver
-Parent should handle sigpipe, child should terminate on sigpipe.
-original pid=7
-parent n=1, global=1, child_pid=8, my_pid=7
-In Sys_Signal, Trying to register signal number: 6
-child n=1, global=1, child_pid=0, my_pid=8
-In Setup_Frame. Find pending signal: 6
-Terminated 8
-In Setup_Frame. Find pending signal: 4
-expected to reap child_pid 8, Wait returned 262
-In Setup_Frame. Find pending signal: 6
-GOOD: sigpiped the parent!
-In Sys_ReturnSignal
-In Complete_Handler
-In Setup_Frame. Find pending signal: 4
 $ 
