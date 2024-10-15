@@ -21,7 +21,6 @@
 #include <geekos/ktypes.h>
 #include <geekos/list.h>
 #include <geekos/smp.h>
-#include <geekos/signal.h>
 
 
 struct Kernel_Thread;
@@ -132,8 +131,6 @@ struct Kernel_Thread *Start_Kernel_Thread(Thread_Start_Func startFunc,
                                           const char *name);
 struct Kernel_Thread *Start_User_Thread(struct User_Context *userContext,
                                         bool detached);
-struct Kernel_Thread *Start_User_Thread_Fork(struct User_Context *userContext);
-void Setup_User_Thread(struct Kernel_Thread *kthread, struct User_Context *userContext);
 void Make_Runnable(struct Kernel_Thread *kthread);
 void Make_Runnable_Atomic(struct Kernel_Thread *kthread);
 int Is_Thread_On_Run_Queue(const struct Kernel_Thread *thread);
@@ -190,7 +187,5 @@ extern void *Tlocal_Get(tlocal_key_t);
 extern void Dump_All_Thread_List(void);
 
 extern void Wake_Up_Locked(struct Thread_Queue *waitQueue);
-
-void Detach_Thread(struct Kernel_Thread *kthread);
 
 #endif /* GEEKOS_KTHREAD_H */

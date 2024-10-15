@@ -26,7 +26,6 @@
 #include <geekos/projects.h>
 #include <geekos/smp.h>
 #include <geekos/synch.h>
-#include <geekos/percpu.h>
 
 extern Spin_Lock_t kthreadLock;
 
@@ -367,9 +366,8 @@ static void Setup_Kernel_Thread(struct Kernel_Thread *kthread,
     Push(kthread, KERNEL_DS);   /* ds */
     Push(kthread, KERNEL_DS);   /* es */
     Push(kthread, 0);           /* fs */
-    // Push(kthread, 0);           /* gs */
-    // TODO_P(PROJECT_PERCPU, "set gs to the per-cpu segment");
-    Push(kthread, KERNEL_GS);
+    Push(kthread, 0);           /* gs */
+    TODO_P(PROJECT_PERCPU, "set gs to the per-cpu segment");
 }
 
 /*
@@ -568,8 +566,7 @@ void Init_Scheduler(unsigned int cpuID, void *stack) {
      */
     Init_Thread(mainThread, stack, PRIORITY_NORMAL, true);
     g_currentThreads[Get_CPU_ID()] = mainThread;
-    // TODO_P(PROJECT_PERCPU, "set the current thread now that we have one");
-    percpu_data[cpuID].current_thread = mainThread;
+    TODO_P(PROJECT_PERCPU, "set the current thread now that we have one");
     Add_To_Back_Of_All_Thread_List(&s_allThreadList, mainThread);
     strcpy(mainThread->threadName, "{Main}");
 
@@ -587,7 +584,6 @@ void Init_Scheduler(unsigned int cpuID, void *stack) {
 
     TODO_P(PROJECT_PERCPU_SCHED,
            "set the idle thread now that we have one");
-    // percpu_data[cpuID].idle_thread = CPUs[cpuID].idleThread;
 
     if(!cpuID) {
         /*
@@ -649,23 +645,6 @@ struct Kernel_Thread *Start_User_Thread(struct User_Context *userContext,
     return kthread;
 }
 
-struct Kernel_Thread *Start_User_Thread_Fork(struct User_Context *userContext) {
-    struct Kernel_Thread *kthread = Create_Thread(PRIORITY_USER, 0);
-    if (kthread != 0) {
-        Setup_User_Thread(kthread, userContext);
-        kthread->esp = CURRENT_THREAD->esp - (ulong_t)CURRENT_THREAD->stackPage + (ulong_t)kthread->stackPage;
-
-        ulong_t stack_size = (ulong_t)kthread->stackPage + PAGE_SIZE - kthread->esp;
-        ulong_t *cur_stack = (ulong_t*)CURRENT_THREAD->stackPage + (PAGE_SIZE - stack_size) / sizeof(ulong_t);
-        ulong_t *new_stack = (ulong_t*)kthread->stackPage + (PAGE_SIZE - stack_size) / sizeof(ulong_t);
-        memcpy(new_stack, cur_stack, stack_size);
-        new_stack[10] = 0;
-        // memcpy(kthread->stackPage, CURRENT_THREAD->stackPage, stack_size);
-        Make_Runnable_Atomic(kthread);
-    }
-    return kthread;
-}
-
 /*
  * Get the thread that currently has the CPU.
  */
@@ -723,7 +702,7 @@ void Schedule_And_Unlock(Spin_Lock_t * unlock_me) {
     runnable = Get_Next_Runnable();
 
     Spin_Unlock(unlock_me);
-    
+
     Switch_To_Thread(runnable);
 }
 
@@ -741,37 +720,6 @@ void Yield(void) {
 }
 
 
-void Close_Current_Thread() {
-    struct Kernel_Thread *result = 0;
-
-
-    bool iflag = Begin_Int_Atomic();
-
-    struct Kernel_Thread *current = get_current_thread(0);      /* interrupts disabled, may use fast */
-
-    /*
-     * TODO: we could remove the requirement that the caller
-     * needs to be the thread's owner by specifying that another
-     * reference is added to the thread before it is returned.
-     */
-
-    Spin_Lock(&kthreadLock);
-    result = Get_Front_Of_All_Thread_List(&s_allThreadList);
-    while (result != 0) {
-        if(result->pid == current->pid) {
-            if(current == result->owner) {
-                Detach_Thread(current);
-                Reap_Thread(current);
-            }
-            break;
-        }
-        result = Get_Next_In_All_Thread_List(result);
-    }
-    Spin_Unlock(&kthreadLock);
-
-    End_Int_Atomic(iflag);
-}
-
 /*
  * Exit the current thread.
  * Calling this function initiates a context switch.
@@ -782,16 +730,6 @@ void Exit(int exitCode) {
     bool iflag;
     struct Kernel_Thread *current = CURRENT_THREAD;
 
-    if (!Interrupts_Enabled())
-        Enable_Interrupts();
-
-    if (current->owner != NULL && 
-        !Is_Member_Of_Thread_Queue(&current->joinQueue, current->owner)) {
-        Send_Signal(current->owner, SIGCHLD);
-    }
-
-    Notify_Children(current);
-
     /* ns14 old form disabled interrupts entirely; now narrower int_atomic sections. */
     KASSERT0(Interrupts_Enabled(),
              "believe exit should be called with interrupts enabled");
@@ -799,6 +737,8 @@ void Exit(int exitCode) {
     /* Thread is dead */
     current->exitCode = exitCode;
     current->alive = false;
+
+
 
     /* Remove timer references this thread has held */
     iflag = Begin_Int_Atomic(); /* seems less than necessary, but appeases. */
@@ -813,7 +753,6 @@ void Exit(int exitCode) {
 
     /* Remove the thread's implicit reference to itself. */
     /* NOTE: may additionally schedule, if we are the last reference to ourselves */
-    // Close_Current_Thread();
     Detach_Thread(CURRENT_THREAD);
 
     /*
@@ -1063,31 +1002,4 @@ void Dump_All_Thread_List(void) {
 
     Spin_Unlock(&kthreadLock);
     Deprecated_End_Int_Atomic(iflag);
-}
-
-struct Kernel_Thread *Get_Zombie_Child(void) {
-    struct Kernel_Thread *combie = NULL;
-    struct Kernel_Thread *cur = Get_Front_Of_All_Thread_List(&s_allThreadList);
-
-    while (cur != NULL) {
-        if (cur->refCount == 1 && !cur->alive && cur->owner == CURRENT_THREAD) {
-            return cur;
-        }
-        cur = Get_Next_In_All_Thread_List(cur);
-    }
-
-    return combie;
-}
-
-void Notify_Children(struct Kernel_Thread *deadThread){
-    struct Kernel_Thread *cur = Get_Front_Of_All_Thread_List(&s_allThreadList);
-
-    while (cur != NULL) {
-        if (cur->owner && cur->owner->pid == deadThread->pid) {
-            cur->owner = NULL;
-            cur->refCount--;
-        }
-        cur = Get_Next_In_All_Thread_List(cur);
-    }
-
 }

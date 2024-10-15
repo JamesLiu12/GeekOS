@@ -33,7 +33,6 @@
 #include <geekos/pipe.h>
 #include <geekos/mem.h>
 #include <geekos/smp.h>
-#include <geekos/gdt.h>
 
 extern Spin_Lock_t kthreadLock;
 
@@ -341,19 +340,7 @@ static int Sys_PS(struct Interrupt_State *state) {
  * Returns: 0 on success or error code (< 0) on error
  */
 static int Sys_Kill(struct Interrupt_State *state) {
-    // TODO_P(PROJECT_SIGNALS, "Sys_Kill system call");
-    int pid = state->ebx;
-    int signalNum = state->ecx;
-    if (!IS_SIGNUM(signalNum)) return EINVALID;
-    
-    struct Kernel_Thread *kthread = Lookup_Thread(pid, 1);
-
-    if (kthread == NULL) return EINVALID;
-
-    if (kthread->userContext == NULL) return EINVALID;
-
-    Send_Signal(kthread, signalNum);
-
+    TODO_P(PROJECT_SIGNALS, "Sys_Kill system call");
     return 0;
 }
 
@@ -365,17 +352,7 @@ static int Sys_Kill(struct Interrupt_State *state) {
  * Returns: 0 on success or error code (< 0) on error
  */
 static int Sys_Signal(struct Interrupt_State *state) {
-    // TODO_P(PROJECT_SIGNALS, "Sys_Signal system call");
-    signal_handler handler = (signal_handler) state->ebx;
-    int signal_num = state->ecx;
-
-    Print("In Sys_Signal, Trying to register signal number: %d\n", signal_num);
-
-    if (signal_num == SIGKILL) return EINVALID;
-    if (!IS_SIGNUM(signal_num)) return EINVALID;
-
-    CURRENT_THREAD->userContext->signals.handlers[signal_num] = handler;
-
+    TODO_P(PROJECT_SIGNALS, "Sys_Signal system call");
     return 0;
 }
 
@@ -391,18 +368,8 @@ static int Sys_Signal(struct Interrupt_State *state) {
  * Returns: 0 on success or error code (< 0) on error
  */
 static int Sys_RegDeliver(struct Interrupt_State *state) {
-    // TODO_P(PROJECT_SIGNALS, "Sys_RegDeliver system call");
-    // struct User_Context *userContext = CURRENT_THREAD->userContext;
-
-    // void *trampolineAddr = (void *)state->ebx;
-
-    // if (userContext == NULL) return EINVALID;
-
-    // userContext->signals.returnSignal = trampolineAddr;
-    Print("In Sys_RegDeliver\n");
-    CURRENT_THREAD->userContext->signals.returnSignal = (void *)state->ebx;
-
     return 0;
+    TODO_P(PROJECT_SIGNALS, "Sys_RegDeliver system call");
 }
 
 /*
@@ -412,14 +379,9 @@ static int Sys_RegDeliver(struct Interrupt_State *state) {
  *
  * Returns: not expected to "return"
  */
-static int Sys_ReturnSignal(struct Interrupt_State *state) {    
-    
-    // Restore_Original_State(CURRENT_THREAD, state);
-    // CURRENT_THREAD->userContext->signals.currentSignal = 0;
-    Print("In Sys_ReturnSignal\n");	
-    Complete_Handler(CURRENT_THREAD, state);
-    
-    return state->eax;
+static int Sys_ReturnSignal(struct Interrupt_State *state) {
+    TODO_P(PROJECT_SIGNALS, "Sys_ReturnSignal system call");
+    return EUNSUPPORTED;
 }
 
 /*
@@ -430,22 +392,8 @@ static int Sys_ReturnSignal(struct Interrupt_State *state) {
  */
 static int Sys_WaitNoPID(struct Interrupt_State *state) {
     /* not required for Spring 2017 */
-    // TODO_P(PROJECT_SIGNALS, "Sys_WaitNoPID system call");
-    // Print("In Sys_WaitNoPID\n");
-    struct Kernel_Thread *zombieThread = Get_Zombie_Child();
-    if (zombieThread == NULL) 
-        return ENOZOMBIES;
-
-    int zombiepid = zombieThread->pid; // Save zombie pid
-
-    // Copy exit code to user variable
-    if (!Copy_To_User(state->ebx, &zombieThread->exitCode, sizeof(int))) 
-        return EUNSPECIFIED;
-
-    Detach_Thread(zombieThread);
-
-    return zombiepid;
-    // return EUNSUPPORTED;
+    TODO_P(PROJECT_SIGNALS, "Sys_WaitNoPID system call");
+    return EUNSUPPORTED;
 }
 
 /*
@@ -935,133 +883,15 @@ static int Sys_PlaySoundFile(struct Interrupt_State *state) {
  *   state->ecx - address of file descriptor for the write side
  */
 static int Sys_Pipe(struct Interrupt_State *state) {
-    struct File *read_file, *write_file;
-    int read_fd, write_fd;
-
-    read_fd = next_descriptor();
-    if (read_fd < 0) return EMFILE;
-
-    int descriptor;
-    for(descriptor = 0;
-        (descriptor < USER_MAX_FILES &&
-        CURRENT_THREAD->userContext->file_descriptor_table[descriptor] != 0)
-        || descriptor == read_fd; 
-        descriptor++) ;
-    if(descriptor == USER_MAX_FILES) return EMFILE;
-
-    write_fd = descriptor;
-    
-    Pipe_Create(&read_file, &write_file);
-
-    read_fd = add_file_to_descriptor_table(read_file);
-    write_fd = add_file_to_descriptor_table(write_file);
-    Copy_To_User(state->ebx, &read_fd, sizeof(read_fd));
-    Copy_To_User(state->ecx, &write_fd, sizeof(write_fd));
-    return 0;
+    TODO_P(PROJECT_PIPE, "Pipe system call");
+    return EUNSUPPORTED;
 }
+
+
 
 static int Sys_Fork(struct Interrupt_State *state) {
-    struct User_Context *cur_context = CURRENT_THREAD->userContext;
-    struct User_Context *new_context = (struct User_Context *)Malloc(sizeof(struct User_Context));
-    if (new_context == NULL) {
-        return ENOMEM;
-    }
-
-    memcpy(new_context, cur_context, sizeof(struct User_Context));
-
-    int i;
-    for (i = 0; i < USER_MAX_FILES; i++) {
-        struct File *file = new_context->file_descriptor_table[i];
-        if (file) file->refCount++;
-    }
-
-    int cpu;
-    for (cpu = 0; cpu < CPU_Count; cpu++) {
-        new_context->ldtDescriptor[cpu] = Allocate_Segment_Descriptor_On_CPU(cpu);
-        if (new_context->ldtDescriptor[cpu] == NULL) {
-            // Free already allocated resources if descriptor allocation fails
-            int j;
-            for (j = 0; j < cpu; j++) {
-                Free_Segment_Descriptor(new_context->ldtDescriptor[j]);
-            }
-            Free(new_context);
-            return ENOMEM;
-        }
-
-        Init_LDT_Descriptor(new_context->ldtDescriptor[cpu], new_context->ldt, NUM_USER_LDT_ENTRIES);
-    }
-
-    // new_context->ldtDescriptor = Allocate_Segment_Descriptor();
-    // Init_LDT_Descriptor(new_context->ldtDescriptor, new_context->ldt, NUM_USER_LDT_ENTRIES);
-
-    new_context->memory = (char *)Malloc(new_context->size);
-    memcpy(new_context->memory, cur_context->memory, new_context->size);
-
-    Init_Code_Segment_Descriptor(&new_context->ldt[0], (ulong_t) new_context->memory, new_context->size / PAGE_SIZE, USER_PRIVILEGE);
-    Init_Data_Segment_Descriptor(&new_context->ldt[1], (ulong_t) new_context->memory, new_context->size / PAGE_SIZE, USER_PRIVILEGE);
-
-    new_context->ldtSelector = Selector(KERNEL_PRIVILEGE, true, Get_Descriptor_Index(new_context->ldtDescriptor));
-    new_context->csSelector = Selector(USER_PRIVILEGE, false, 0);
-    new_context->dsSelector = Selector(USER_PRIVILEGE, false, 1);
-
-    new_context->entryAddr = cur_context->entryAddr;
-    new_context->argBlockAddr = cur_context->argBlockAddr;
-    new_context->stackPointerAddr = cur_context->stackPointerAddr;
-
-    for (i = 0; i < MAXSIG; i++) {
-        new_context->signals.handlers[i] = cur_context->signals.handlers[i];
-    }
-    new_context->signals.returnSignal = cur_context->signals.returnSignal;
-
-    struct Kernel_Thread *new_thread = Start_User_Thread_Fork(new_context);
-    return new_thread == 0 ? ENOMEM : new_thread->pid;
-}
-
-int Do_Execl(char *program, char *command) {
-    int rc = 0, rc2 = 0, rc3 = 0;
-    char *exeFileData = 0;
-    ulong_t exeFileLength;
-    struct User_Context *userContext = 0;
-    struct Exe_Format exeFormat;
-
-    /*
-     * Load the executable file data, parse ELF headers,
-     * and load code and data segments into user memory.
-     */
-
-    if((rc =
-        Read_Fully(program, (void **)&exeFileData, &exeFileLength)) != 0
-       || (rc2 =
-           Parse_ELF_Executable(exeFileData, exeFileLength,
-                                &exeFormat)) != 0 ||
-       (rc3 =
-        Load_User_Program(exeFileData, exeFileLength, &exeFormat, command,
-                          &userContext)) != 0) {
-        rc |= rc2 | rc3;        /* since all are zero, this sets rc to whichever one is nonzero.
-                                   breakpoint here if you need to know which one failed. */
-        goto fail;
-    }
-
-    /*
-     * User program has been loaded, so we can free the
-     * executable file data now.
-     */
-    Free(exeFileData);
-    exeFileData = 0;
-
-    CURRENT_THREAD->esp = (ulong_t)CURRENT_THREAD->stackPage + PAGE_SIZE;
-    Detach_User_Context(CURRENT_THREAD);
-    Setup_User_Thread(CURRENT_THREAD, userContext);
-
-    return 0;
-
-  fail:
-    if(exeFileData != 0)
-        Free(exeFileData);
-    if(userContext != 0)
-        Destroy_User_Context(userContext);
-
-    return rc;
+    TODO_P(PROJECT_FORK, "Fork system call");
+    return EUNSUPPORTED;
 }
 
 /* 
@@ -1074,34 +904,8 @@ int Do_Execl(char *program, char *command) {
  * Returns: doesn't if successful, error code (< 0) otherwise
  */
 static int Sys_Execl(struct Interrupt_State *state) {
-    // char program[128];
-    // char command[128];
-
-    // Copy_From_User(program, state->ebx, state->ecx);
-    // Copy_From_User(command, state->edx, state->esi);
-
-    int rc;
-    char *program = 0;
-    char *command = 0;
-    struct Kernel_Thread *process = NULL;
-
-    /* Copy program name and command from user space. */
-    if((rc =
-        Copy_User_String(state->ebx, state->ecx, VFS_MAX_PATH_LEN,
-                         &program)) != 0 ||
-       (rc =
-        Copy_User_String(state->edx, state->esi, 1023, &command)) != 0)
-        goto done;
-
-    rc = Do_Execl(program, command);
-
-  done:
-    if(program != 0)
-        Free(program);
-    if(command != 0)
-        Free(command);
-    
-    return rc;
+    TODO_P(PROJECT_FORK, "Execl system call");
+    return EUNSUPPORTED;
 }
 
 /* 

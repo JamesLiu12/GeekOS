@@ -1,7 +1,7 @@
-BSS = 4f088
+BSS = 4c888
 start kern info = 90000
 Creating kernel heap: start=102000, size=1048576
-527232KB memory detected, 130359 pages in freelist, 1048576 bytes in kernel heap
+527232KB memory detected, 130362 pages in freelist, 1048576 bytes in kernel heap
 Initializing IDT...
 Init_SMP
 Initializing SMP...
@@ -19,8 +19,8 @@ ide: found no drive 1
 the global lock is not held.
 Registering paging device: /c/pagefile.bin on ide0 with 10240 sectors
 Mounted /c filesystem!
-Never gonna give you up!
 Welcome to GeekOS!
 Spawning init process (/c/shell.exe)
-In Sys_RegDeliver
-$ 
+$ exit[25;6ft[25;6ft
+DONE!
+Init process exited with code 0

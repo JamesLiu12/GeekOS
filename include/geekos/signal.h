@@ -34,35 +34,6 @@
 /* Definition of a signal handler */
 typedef void (*signal_handler) (int);
 
-struct Signal_Node {
-    int signalNum;
-    struct Signal_Node *next;
-    struct Signal_Node *prev;
-};
-
-struct Signal_Deque {
-    struct Signal_Node *head;
-    struct Signal_Node *tail;
-};
-
-struct Process_Signals {
-    signal_handler handlers[MAXSIG + 1];
-    int handlingSignal;
-    signal_handler returnSignal;
-    int pendingSignal;
-    struct Signal_Deque sigQueue;
-};
-
-void initProcess_Signals(struct Process_Signals* signals);
-int isEmpty(struct Signal_Deque* deque);
-void pushFront(struct Signal_Deque* deque, int data);
-void pushBack(struct Signal_Deque* deque, int data);
-int popFront(struct Signal_Deque* deque);
-int popBack(struct Signal_Deque* deque);
-
-void Send_Signal(struct Kernel_Thread *kthread, int signum);
-
-
 /* Default handlers */
 #define SIG_DFL  (signal_handler)1
 #define SIG_IGN  (signal_handler)2

@@ -52,7 +52,6 @@
 #include <geekos/smp.h>
 #include <geekos/io.h>
 #include <geekos/serial.h>
-#include <geekos/percpu.h>
 
 
 /*
@@ -118,8 +117,7 @@ void Main(struct Boot_Info *bootInfo) {
     Init_Screen();
     Init_Mem(bootInfo);
     Init_CRC32();
-    // TODO_P(PROJECT_PERCPU, "Initialize PERCPU");
-    Init_PerCPU(0);
+    TODO_P(PROJECT_PERCPU, "Initialize PERCPU");
     Init_TSS();
 
     /* by modifying begin_int_atomic to autolock if not locked when interrupts are disabled, 
@@ -176,7 +174,6 @@ void Main(struct Boot_Info *bootInfo) {
     TODO_P(PROJECT_VIRTUAL_MEMORY_A, "initialize page file.");
 
     Set_Current_Attr(ATTRIB(BLACK, GREEN | BRIGHT));
-    Print("Never gonna give you up!\n");
     Print("Welcome to GeekOS!\n");
     Set_Current_Attr(ATTRIB(BLACK, GRAY));
 

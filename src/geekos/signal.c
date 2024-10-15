@@ -35,113 +35,6 @@
 #include <geekos/projects.h>
 #include <geekos/alarm.h>
 #include <geekos/smp.h>
-#include <geekos/errno.h>
-
-void initProcess_Signals(struct Process_Signals* signals) {
-    signals->handlingSignal = 0;
-    signals->pendingSignal = 0;
-    signals->returnSignal = NULL;
-    signals->sigQueue.head = NULL;
-    signals->sigQueue.tail = NULL;
-    int i;
-    for (i = 1; i <= MAXSIG; i++) {
-        signals->handlers[i] = SIG_DFL;
-    }
-}
-int isEmpty(struct Signal_Deque* deque) {
-    return (deque->head == NULL);
-}
-void pushFront(struct Signal_Deque* deque, int signalNum) {
-    // Print("pushFront\n");
-    struct Signal_Node *newNode = (struct Signal_Node*)Malloc(sizeof(struct Signal_Node));
-    newNode->signalNum = signalNum;
-    newNode->next = deque->head;
-    newNode->prev = NULL;
-
-    if (isEmpty(deque)) {
-        deque->tail = newNode;
-    } else {
-        deque->head->prev = newNode;
-    }
-    deque->head = newNode;
-}
-void pushBack(struct Signal_Deque* deque, int signalNum) {
-    // Print("pushBack %d\n", signalNum);
-    struct Signal_Node *newNode = (struct Signal_Node*)Malloc(sizeof(struct Signal_Node));
-    newNode->signalNum = signalNum;
-    newNode->next = NULL;
-    newNode->prev = deque->tail;
-
-    if (isEmpty(deque)) {
-        deque->head = newNode;
-    } else {
-        deque->tail->next = newNode;
-    }
-
-    deque->tail = newNode;
-}
-int popFront(struct Signal_Deque* deque) {
-    // Print("popFront %d\n", deque->head->signalNum);
-    if (isEmpty(deque)) {
-        Print("Deque is empty, nothing to pop from the front.\n");
-        return;
-    }
-
-    struct Signal_Node *temp = deque->head;
-    int res = temp->signalNum;
-    deque->head = deque->head->next;
-
-    if (deque->head == NULL) {
-        deque->tail = NULL;
-    } else {
-        deque->head->prev = NULL;
-    }
-
-    Free(temp);
-    return res;
-}
-int popBack(struct Signal_Deque* deque) {
-    // Print("popBack\n");
-    if (isEmpty(deque)) {
-        Print("Deque is empty, nothing to pop from the rear.\n");
-        while (1);
-        return;
-    }
-
-    struct Signal_Node *temp = deque->tail;
-    int res = temp->signalNum;
-    deque->tail = deque->tail->prev;
-
-    if (deque->tail == NULL) {
-        deque->head = NULL;
-    } else {
-        deque->tail->next = NULL;
-    }
-
-    Free(temp);
-    return res;
-}
-int getFrontNode(struct Signal_Deque* deque) {
-    if (isEmpty(deque)) {
-        // Print("Deque is empty, no front element.\n");
-        return -1;
-    }
-    return deque->head;
-}
-int getBackNode(struct Signal_Deque* deque) {
-    if (isEmpty(deque)) {
-        // Print("Deque is empty, no rear element.\n");
-        return -1;
-    }
-    return deque->tail;
-}
-int getNextNode(struct Signal_Node* node) {
-    if (node == NULL) {
-        // Print("Node is NULL, no next element.\n");
-        return -1;
-    }
-    return node->next;
-}
 
 
 /* Called when signal handling is complete. */
@@ -149,20 +42,8 @@ void Complete_Handler(struct Kernel_Thread *kthread,
                       struct Interrupt_State *state) {
     KASSERT(kthread);
     KASSERT(state);
-    // TODO_P(PROJECT_SIGNALS,
-    //        "Complete_Handler cleans up after a signal handler");
-    Print("In Complete_Handler\n");
-
-    struct User_Interrupt_State *userState = (struct User_Interrupt_State *)state;
-
-    kthread->userContext->signals.handlingSignal = 0;
-
-    userState->espUser += sizeof(int);
-
-    if (!Copy_From_User(state, userState->espUser, sizeof(struct Interrupt_State))) 
-        return EUNSPECIFIED;
-
-    userState->espUser += sizeof(struct Interrupt_State);
+    TODO_P(PROJECT_SIGNALS,
+           "Complete_Handler cleans up after a signal handler");
 }
 
 int Check_Pending_Signal(struct Kernel_Thread *kthread,
@@ -170,40 +51,9 @@ int Check_Pending_Signal(struct Kernel_Thread *kthread,
     KASSERT(kthread);
     KASSERT(state);
 
-    if (kthread->userContext->signals.pendingSignal == 0 || 
-        state->cs == KERNEL_CS || 
-        kthread->userContext->signals.handlingSignal != 0) {
-        return 0;
-    }
-
-    return 1;
-
-}
-
-void Send_Signal(struct Kernel_Thread *kthread, int signum) {
-    // struct Signal_Node *currSig = getFrontNode(
-    //                                     &kthread->userContext->signals.sigQueue);
-                                        
-    // Print("Sent Signal %d\n", signum);
-    
-    // while (currSig != 0) {
-    //     if (currSig->signalNum == signum){
-    //         return;
-    //     }
-        
-    //     currSig = getNextNode(currSig);
-    // }
-
-    // Print("Recieved Signal %d\n", signum);
-
-    kthread->userContext->signals.pendingSignal = 1;
-    
-    if (signum == SIGKILL) {
-        pushFront(&kthread->userContext->signals.sigQueue, signum);
-    }
-    else {
-        pushBack(&kthread->userContext->signals.sigQueue, signum);
-    }
+    return 0;
+    TODO_P(PROJECT_SIGNALS,
+           "Check_Pending_Signal returns 1 if this thread has a pending signal");
 }
 
 #if 0
@@ -246,41 +96,5 @@ void Setup_Frame(struct Kernel_Thread *kthread,
     KASSERT(kthread);
     KASSERT(state);
 
-
-    kthread->userContext->signals.handlingSignal = 1;
-
-    struct User_Interrupt_State *user = (struct User_Interrupt_State *)state;
-    int signum = popFront(&kthread->userContext->signals.sigQueue);
-    signal_handler sigHand = kthread->userContext->signals.handlers[signum];
-
-    Print("In Setup_Frame. Find pending signal: %d\n", signum);
-
-    if (isEmpty(&kthread->userContext->signals.sigQueue))
-        kthread->userContext->signals.pendingSignal = 0;
-
-
-    if (sigHand == SIG_IGN) {
-        kthread->userContext->signals.handlingSignal = 0;
-        return;
-    } else if (sigHand == SIG_DFL) {
-        kthread->userContext->signals.handlingSignal = 0;
-        if (signum == SIGCHLD) return;
-        Print("Terminated %d\n", CURRENT_THREAD->pid);
-        Exit(262);
-    } else {
-        user->espUser -= sizeof(struct Interrupt_State);
-        if (!Copy_To_User(user->espUser, state, sizeof(struct Interrupt_State))) 
-            return EUNSPECIFIED;
-        
-        user->espUser -= sizeof(int);
-        if (!Copy_To_User(user->espUser, &signum, sizeof(int))) 
-            return EUNSPECIFIED;
-        
-        user->espUser -= sizeof(signal_handler);
-        if (!Copy_To_User(user->espUser, &kthread->userContext->signals.returnSignal, sizeof(signal_handler))) 
-            return EUNSPECIFIED;
-
-        state->eip = sigHand;
-    }
-
+    TODO_P(PROJECT_SIGNALS, "Setup_Frame");
 }

@@ -19,13 +19,3 @@ int Pipe_Create(struct File **read_file, struct File **write_file);
 int Pipe_Read(struct File *f, void *buf, ulong_t numBytes);
 int Pipe_Write(struct File *f, void *buf, ulong_t numBytes);
 int Pipe_Close(struct File *f);
-
-#define PIPE_BUFFER_CAPACITY 32768
-struct Pipe {
-    void *buffer;
-    size_t read_pos;
-    size_t write_pos;
-    int reader;
-    int writer;
-    size_t buffer_size;
-};

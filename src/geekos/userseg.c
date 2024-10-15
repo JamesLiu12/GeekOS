@@ -26,8 +26,6 @@
 #include <geekos/argblock.h>
 #include <geekos/user.h>
 #include <geekos/smp.h>
-#include <geekos/signal.h>
-#include <geekos/gdt.h>
 
 /* ----------------------------------------------------------------------
  * Variables
@@ -53,7 +51,7 @@ void *User_To_Kernel(struct User_Context *userContext, ulong_t userPtr) {
  */
 extern struct User_Context *Create_User_Context(ulong_t size) {
     struct User_Context *context;
-    int index, cpu;
+    int index;
 
     /* Size must be a multiple of the page size */
     size = Round_Up_To_Page(size);
@@ -79,31 +77,17 @@ extern struct User_Context *Create_User_Context(ulong_t size) {
 
     context->size = size;
 
-    for (cpu = 0; cpu < CPU_Count; cpu++) {
-        context->ldtDescriptor[cpu] = Allocate_Segment_Descriptor_On_CPU(cpu);
-        if (context->ldtDescriptor[cpu] == 0)
-            goto fail;
-        
-        if (userDebug)
-            Print("Allocated descriptor %d for LDT on CPU %d\n",
-                  Get_Descriptor_Index(context->ldtDescriptor[cpu]), cpu);
-
-        Init_LDT_Descriptor(context->ldtDescriptor[cpu], context->ldt, NUM_USER_LDT_ENTRIES);
-        index = Get_Descriptor_Index(context->ldtDescriptor[cpu]);
-        context->ldtSelector = Selector(KERNEL_PRIVILEGE, true, index);
-    }
-
-    // /* Allocate an LDT descriptor for the user context */
-    // context->ldtDescriptor = Allocate_Segment_Descriptor();
-    // if(context->ldtDescriptor == 0)
-    //     goto fail;
-    // if(userDebug)
-    //     Print("Allocated descriptor %d for LDT\n",
-    //           Get_Descriptor_Index(context->ldtDescriptor));
-    // Init_LDT_Descriptor(context->ldtDescriptor, context->ldt,
-    //                     NUM_USER_LDT_ENTRIES);
-    // index = Get_Descriptor_Index(context->ldtDescriptor);
-    // context->ldtSelector = Selector(KERNEL_PRIVILEGE, true, index);
+    /* Allocate an LDT descriptor for the user context */
+    context->ldtDescriptor = Allocate_Segment_Descriptor();
+    if(context->ldtDescriptor == 0)
+        goto fail;
+    if(userDebug)
+        Print("Allocated descriptor %d for LDT\n",
+              Get_Descriptor_Index(context->ldtDescriptor));
+    Init_LDT_Descriptor(context->ldtDescriptor, context->ldt,
+                        NUM_USER_LDT_ENTRIES);
+    index = Get_Descriptor_Index(context->ldtDescriptor);
+    context->ldtSelector = Selector(KERNEL_PRIVILEGE, true, index);
 
     /* Initialize code and data segments within the LDT */
     Init_Code_Segment_Descriptor(&context->ldt[0],
@@ -118,7 +102,6 @@ extern struct User_Context *Create_User_Context(ulong_t size) {
     /* Nobody is using this user context yet */
     context->refCount = 0;
 
-    initProcess_Signals(&context->signals);
 
     /* Success! */
     return context;
@@ -162,10 +145,7 @@ void Destroy_User_Context(struct User_Context *userContext) {
     KASSERT(userContext->refCount == 0);
 
     /* Free the context's LDT descriptor */
-    int cpu;
-    for (cpu = 0; cpu < CPU_Count; cpu++) {
-        Free_Segment_Descriptor(userContext->ldtDescriptor[cpu]);
-    }
+    Free_Segment_Descriptor(userContext->ldtDescriptor);
 
     /* Free the context's memory */
     Free(userContext->memory);

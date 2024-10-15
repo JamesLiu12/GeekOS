@@ -87,10 +87,6 @@ void Init_Null_Segment_Descriptor(struct Segment_Descriptor *desc);
 void Init_Code_Segment_Descriptor(struct Segment_Descriptor *desc,
                                   ulong_t baseAddr,
                                   ulong_t numPages, int privilegeLevel);
-void Init_PerCPU_Segment_Descriptor(struct Segment_Descriptor *desc, 
-                                    ulong_t baseAddr, 
-                                    ulong_t numBytes, 
-                                    int privilegeLevel);
 void Init_Data_Segment_Descriptor(struct Segment_Descriptor *desc,
                                   ulong_t baseAddr,
                                   ulong_t numPages, int privilegeLevel);

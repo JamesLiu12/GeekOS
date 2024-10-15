@@ -26,7 +26,7 @@ typedef struct CPU_Info {
     struct Kernel_Thread *idleThread;
     struct User_Context *s_currentUserContext;
 } CPU_Info;
-extern int CPU_Count;
+
 extern volatile CPU_Info CPUs[];
 
 int Get_CPU_ID(void);

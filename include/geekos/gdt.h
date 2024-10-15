@@ -15,8 +15,6 @@
  * 
  */
 
-#include <geekos/segment.h>
-
 #ifndef GEEKOS_GDT_H
 #define GEEKOS_GDT_H
 

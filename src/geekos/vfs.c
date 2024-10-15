@@ -408,14 +408,11 @@ int Close(struct File *file) {
 
     KASSERT(file->ops->Close != 0);     /* All filesystems must implement Close(). */
 
-    Mutex_Lock(&s_vfsLock);
-    file->refCount--;
-    Mutex_Unlock(&s_vfsLock);
+    TODO_P(PROJECT_FORK, "Manage reference count");
 
     rc = file->ops->Close(file);
-    if(rc == 0 && file->refCount == 0 && file != NULL)
+    if(rc == 0)
         Free(file);
-    
     return rc;
 }
 
