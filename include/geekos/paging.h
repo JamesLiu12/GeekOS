@@ -34,6 +34,7 @@ struct User_Context;
 
 #define PAGE_ALIGNED_ADDR(x)   (((unsigned int) (x)) >> 12)
 #define PAGE_ADDR(x)   (PAGE_ALIGNED_ADDR(x) << 12)
+#define PAGE_ORIG(x) ((unsigned int)(x) << 12)
 
 /*
  * Bits for flags field of pde_t and pte_t.

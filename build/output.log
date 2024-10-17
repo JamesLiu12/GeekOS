@@ -8,6 +8,7 @@ Initializing SMP...
 found CPU#0 with APIC id #0
 found IO APIC ID=0 at fec00000
 /Init_SMP
+Paging on ? : 1
 apic counted down to fff676b7
 cpu freq = 1004348800
 Initializing timer...
@@ -21,6 +22,4 @@ Registering paging device: /c/pagefile.bin on ide0 with 10240 sectors
 Mounted /c filesystem!
 Welcome to GeekOS!
 Spawning init process (/c/shell.exe)
-$ exit[25;6ft[25;6ft
-DONE!
-Init process exited with code 0
+$ 

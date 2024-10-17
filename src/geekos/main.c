@@ -127,8 +127,10 @@ void Main(struct Boot_Info *bootInfo) {
     Print("Init_SMP\n");
     Init_SMP();
     Print("/Init_SMP\n");
-    TODO_P(PROJECT_VIRTUAL_MEMORY_A,
-           "initialize virtual memory page tables.");
+    // TODO_P(PROJECT_VIRTUAL_MEMORY_A,
+    //        "initialize virtual memory page tables.");
+    Init_VM(bootInfo);
+    checkPaging();
     Init_Scheduler(0, (void *)KERN_STACK);
     Init_Traps();
     Init_Local_APIC(0);

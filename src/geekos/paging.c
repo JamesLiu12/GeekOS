@@ -45,6 +45,8 @@
 
 #define SECTORS_PER_PAGE (PAGE_SIZE / SECTOR_SIZE)
 
+pde_t *pageDir;
+
 /*
  * flag to indicate if debugging paging code
  */
@@ -55,8 +57,8 @@ int debugFaults = 0;
 /* const because we do not expect any caller to need to
    modify the kernel page directory */
 const pde_t *Kernel_Page_Dir(void) {
-    TODO_P(PROJECT_VIRTUAL_MEMORY_A, "return kernel page directory");
-    return NULL;
+    // TODO_P(PROJECT_VIRTUAL_MEMORY_A, "return kernel page directory");
+    return pageDir;
 }
 
 
@@ -128,6 +130,8 @@ union type_pun_workaround {
 
   error:
     Print("Unexpected Page Fault received\n");
+    static cc = 0;
+    Print("cc: %d\n", cc++);
     Print_Fault_Info(address, faultCode);
     Dump_Interrupt_State(state);
     /* user faults just kill the process; not user mode faults should halt the kernel. */
@@ -162,12 +166,83 @@ void Init_VM(struct Boot_Info *bootInfo) {
      * - Do not map a page at address 0; this will help trap
      *   null pointer references
      */
-    TODO_P(PROJECT_VIRTUAL_MEMORY_A,
-           "Build initial kernel page directory and page tables");
+    pte_t *pageTable;
+    unsigned int numOfPageEntries = (bootInfo->memSizeKB + 3) / 4;
+    
+    pageDir = Alloc_Page();
+    if (pageDir == 0) Exit(-1);
+    memset(pageDir, 0, PAGE_SIZE);
+
+    int pageCount = 0, pageDirIndex = 0;
+    for (pageDirIndex = 0; pageDirIndex < NUM_PAGE_DIR_ENTRIES; pageDirIndex++) {
+        if (pageCount < numOfPageEntries) {
+            pageTable = Alloc_Page();
+            if (pageTable == 0) Exit(-1);
+            memset(pageTable, 0, PAGE_SIZE);
+
+            pageDir[pageDirIndex].present = 1;
+            pageDir[pageDirIndex].flags = VM_WRITE | VM_READ | VM_USER;
+            pageDir[pageDirIndex].pageTableBaseAddr = PAGE_ALIGNED_ADDR(pageTable);
+            KASSERT(PAGE_DIRECTORY_INDEX(pageCount * PAGE_SIZE) == pageDirIndex);
+
+            int pageTableIndex = 0;
+            for (pageTableIndex = 0; pageTableIndex < NUM_PAGE_TABLE_ENTRIES; pageTableIndex++) {
+                if (pageCount < numOfPageEntries) {
+                    pageTable[pageTableIndex].present = 1;
+                    pageTable[pageTableIndex].flags = VM_WRITE | VM_READ | VM_USER;
+                    pageTable[pageTableIndex].pageBaseAddr = PAGE_ALIGNED_ADDR(pageCount * PAGE_SIZE);
+                    KASSERT(PAGE_TABLE_INDEX(pageCount * PAGE_SIZE) == pageTableIndex);
+                    pageCount++;
+                }
+                else break;
+            }
+        }
+        else {
+            break;
+        }
+    }
+
+    unsigned int apicBaseAddr = 0xfee00000;
+
+    int apicDirIndex = PAGE_DIRECTORY_INDEX(apicBaseAddr);
+    int apicTableIndex = PAGE_TABLE_INDEX(apicBaseAddr);
+
+    pte_t *apicPageTable = Alloc_Page();
+    if (apicPageTable == 0) Exit(-1);
+    memset(apicPageTable, 0, PAGE_SIZE);
+
+    pageDir[apicDirIndex].present = 1;
+    pageDir[apicDirIndex].flags = VM_WRITE | VM_READ;
+    pageDir[apicDirIndex].pageTableBaseAddr = PAGE_ALIGNED_ADDR(apicPageTable);
+
+    apicPageTable[apicTableIndex].present = 1;
+    apicPageTable[apicTableIndex].flags = VM_WRITE | VM_READ;
+    apicPageTable[apicTableIndex].pageBaseAddr = PAGE_ALIGNED_ADDR(apicBaseAddr);
+
+    //-----------------------------------------------------------------------------------
+
+    unsigned int ioApicBaseAddr = 0xfec00000;
+
+    int ioApicDirIndex = PAGE_DIRECTORY_INDEX(ioApicBaseAddr);
+    int ioApicTableIndex = PAGE_TABLE_INDEX(ioApicBaseAddr);
+
+    pageDir[ioApicDirIndex].present = 1;
+    pageDir[ioApicDirIndex].flags = VM_WRITE | VM_READ;
+    pageDir[ioApicDirIndex].pageTableBaseAddr = PAGE_ALIGNED_ADDR(apicPageTable);
+
+    apicPageTable[ioApicTableIndex].present = 1;
+    apicPageTable[ioApicTableIndex].flags = VM_WRITE | VM_READ;
+    apicPageTable[ioApicTableIndex].pageBaseAddr = PAGE_ALIGNED_ADDR(ioApicBaseAddr);
+
+    ((pte_t *)PAGE_ORIG(pageDir[0].pageTableBaseAddr))[0].present = 0;
+
+    Enable_Paging(pageDir);
+    Install_Interrupt_Handler(14, Page_Fault_Handler);
 }
 
 void Init_Secondary_VM() {
-    TODO_P(PROJECT_VIRTUAL_MEMORY_A, "enable paging on secondary cores");
+    Enable_Paging(pageDir);
+    Install_Interrupt_Handler(14, Page_Fault_Handler);
 }
 
 /**

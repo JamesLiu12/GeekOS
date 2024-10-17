@@ -4,7 +4,7 @@
 
 courseName=CMSC412
 semester=202408
-projectNumber=project 3
+projectNumber=project 4a
 courseKey=e36f4685caf73d6c
 authentication.type=cas
 baseURL=https://submit.cs.umd.edu:443/fall2024
