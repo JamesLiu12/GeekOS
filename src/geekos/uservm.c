@@ -29,17 +29,178 @@
 #include <geekos/synch.h>
 #include <geekos/errno.h>
 
-
 extern Spin_Lock_t kthreadLock;
 
 int userDebug = 0;
 #define Debug(args...) if (userDebug) Print("uservm: " args)
+
+#define MEM_KERNEL_START 0x00000000
+#define MEM_USER_START   0x80000000
+#define MEM_TEXT         0x80001000
+#define MEM_STACK        0xF0000000
+#define MEM_USER_END     0xF0000000
+#define MEM_APICIO       0xFEC00000
+#define MEM_APIC         0xFEE00000
+#define MEM_END          0xFFFFFFFF
 
 /* ----------------------------------------------------------------------
  * Private functions
  * ---------------------------------------------------------------------- */
 
 // TODO: Add private functions
+void *User_To_Kernel(struct User_Context *userContext, ulong_t userPtr) {
+    uchar_t *userBase = (uchar_t *) userContext->memory;
+
+    return (void *)(userBase + userPtr);
+}
+
+void *Get_Page_Addr(ulong_t virtualAddress, pde_t *pageDir) {
+    int pageDirIndex = PAGE_DIRECTORY_INDEX(virtualAddress);
+    int pageTblIndex = PAGE_TABLE_INDEX(virtualAddress);
+
+
+    if (pageDir[pageDirIndex].present == 0) {
+        pte_t *pageTbl = Alloc_Page(); 
+        if (pageTbl == 0) Exit(-1);
+        memset(pageTbl, 0, PAGE_SIZE);
+        pageDir[pageDirIndex].present = 1;
+        pageDir[pageDirIndex].flags = VM_USER | VM_WRITE | VM_READ;
+        pageDir[pageDirIndex].pageTableBaseAddr = PAGE_ALIGNED_ADDR(pageTbl);
+    } 
+
+    pte_t *pageTbl = PAGE_LEFT(pageDir[pageDirIndex].pageTableBaseAddr);
+
+    if (pageTbl[pageTblIndex].present == 0) {
+        void *pageAddr = Alloc_Pageable_Page(&pageTbl[pageTblIndex], PAGE_ADDR(virtualAddress));
+        if (pageAddr == 0) Exit(-1);
+        memset(pageAddr, 0, PAGE_SIZE);
+        pageTbl[pageTblIndex].present = 1;
+        pageTbl[pageTblIndex].flags = VM_USER | VM_WRITE | VM_READ;
+        pageTbl[pageTblIndex].pageBaseAddr = PAGE_ALIGNED_ADDR(pageAddr);
+    }
+
+    Disable_Interrupts();
+
+    void *pageAddress = PAGE_LEFT(pageTbl[pageTblIndex].pageBaseAddr);
+
+    struct Page *page = Get_Page(pageAddress);                
+    page->flags &= ~(PAGE_PAGEABLE);
+
+    Enable_Interrupts();
+
+    return pageAddress;
+}
+
+void Make_Page_Pageable(ulong_t virtualAddress, pde_t *pageDir) {
+    int pageDirIndex = PAGE_DIRECTORY_INDEX(virtualAddress);
+    int pageTableIndex = PAGE_TABLE_INDEX(virtualAddress);
+
+    Disable_Interrupts();
+
+    pte_t *pageTbl = PAGE_LEFT(pageDir[pageDirIndex].pageTableBaseAddr);
+    ulong_t pageAddress = PAGE_LEFT(pageTbl[pageTableIndex].pageBaseAddr);
+    struct Page *page = Get_Page(pageAddress);
+    page->flags |= PAGE_PAGEABLE;
+
+    Enable_Interrupts();
+}
+
+void Make_Page_ReadOnly(ulong_t virtualAddress, pde_t *pageDir) {
+    int pageDirIndex = PAGE_DIRECTORY_INDEX(virtualAddress);
+    int pageTableIndex = PAGE_TABLE_INDEX(virtualAddress);
+
+    Disable_Interrupts();
+
+    pte_t *pageTbl = PAGE_LEFT(pageDir[pageDirIndex].pageTableBaseAddr);
+    ulong_t pageAddress = PAGE_LEFT(pageTbl[pageTableIndex].pageBaseAddr);
+    struct Page *page = Get_Page(pageAddress);
+    page->flags &= ~(VM_WRITE);
+
+    Enable_Interrupts();
+}
+
+extern struct User_Context *Create_User_Context() {
+    struct User_Context *context;
+    int index;
+
+    /* Allocate memory for the user context */
+    context = (struct User_Context *)Malloc(sizeof(*context));
+
+    if(context == 0)
+        goto fail;
+
+    memset(context, 0, sizeof(struct User_Context));
+
+    context->memory = (void*)MEM_USER_START;
+    context->size = MEM_USER_END - MEM_USER_START + 1;
+
+    pte_t *userPageDir = Alloc_Page();
+    if (userPageDir == 0) Exit(-1);
+    memset(userPageDir, 0, PAGE_SIZE);
+    context->pageDir = userPageDir;
+
+    memcpy(context->pageDir, Kernel_Page_Dir(), NUM_PAGE_DIR_ENTRIES * sizeof(pde_t) / 2);
+
+    // int pageDirIndex = 0;
+    // for (pageDirIndex = 0; pageDirIndex < NUM_PAGE_DIR_ENTRIES / 2; pageDirIndex++) {
+    //     if (Kernel_Page_Dir()[pageDirIndex].present == 1) {
+    //         context->pageDir[pageDirIndex] = Kernel_Page_Dir()[pageDirIndex];
+    //         memcpy(&context->pageDir[pageDirIndex], &Kernel_Page_Dir()[pageDirIndex], sizeof(pde_t));
+    //     }
+    // }
+    // print("pageDirIndex: %d\n", pageDirIndex);
+    // for (pageDirIndex = PAGE_DIRECTORY_INDEX(MEM_STACK); pageDirIndex < PAGE_DIRECTORY_INDEX(MEM_END); pageDirIndex++) {
+    //     if (Kernel_Page_Dir()[pageDirIndex].present == 1) {
+    //         context->pageDir[pageDirIndex] = Kernel_Page_Dir()[pageDirIndex];
+    //     }
+    // }
+    // print("pageDirIndex: %d\n", pageDirIndex);
+
+    int apicDirIndex = PAGE_DIRECTORY_INDEX(MEM_APIC);
+    // int apicioDirIndex = PAGE_DIRECTORY_INDEX(MEM_APICIO);
+
+    context->pageDir[apicDirIndex] = Kernel_Page_Dir()[apicDirIndex];
+    // context->pageDir[apicioDirIndex] = Kernel_Page_Dir()[apicioDirIndex];
+
+    /* Allocate an LDT descriptor for the user context */
+    context->ldtDescriptor = Allocate_Segment_Descriptor();
+    if(context->ldtDescriptor == 0)
+        goto fail;
+    if(userDebug)
+        Print("Allocated descriptor %d for LDT\n",
+              Get_Descriptor_Index(context->ldtDescriptor));
+    Init_LDT_Descriptor(context->ldtDescriptor, context->ldt,
+                        NUM_USER_LDT_ENTRIES);
+    index = Get_Descriptor_Index(context->ldtDescriptor);
+    context->ldtSelector = Selector(KERNEL_PRIVILEGE, true, index);
+
+    /* Initialize code and data segments within the LDT */
+    Init_Code_Segment_Descriptor(&context->ldt[0],
+                                 MEM_USER_START,
+                                 (MEM_USER_END - MEM_USER_START + 1) / PAGE_SIZE, 
+                                 USER_PRIVILEGE);
+    Init_Data_Segment_Descriptor(&context->ldt[1],
+                                 MEM_USER_START,
+                                 (MEM_USER_END - MEM_USER_START + 1) / PAGE_SIZE, 
+                                 USER_PRIVILEGE);
+    context->csSelector = Selector(USER_PRIVILEGE, false, 0);
+    context->dsSelector = Selector(USER_PRIVILEGE, false, 1);
+
+    /* Nobody is using this user context yet */
+    context->refCount = 0;
+
+
+    /* Success! */
+    return context;
+
+  fail:
+    /* We failed; release any allocated memory */
+    if(context != 0) {
+        Free(context);
+    }
+
+    return 0;
+}
 
 
 /* ----------------------------------------------------------------------
@@ -59,8 +220,41 @@ void Destroy_User_Context(struct User_Context *context) {
      * - Free semaphores, files, and other resources used
      *   by the process
      */
-    TODO_P(PROJECT_VIRTUAL_MEMORY_A,
-           "Destroy User_Context data structure after process exits");
+    // TODO_P(PROJECT_VIRTUAL_MEMORY_A,
+    //        "Destroy User_Context data structure after process exits");
+
+    KASSERT(context->refCount == 0);
+
+    /* Free the context's LDT descriptor */
+    Free_Segment_Descriptor(context->ldtDescriptor);
+    
+    pde_t *pageDir = context->pageDir;
+    int pageDirIndex = PAGE_DIRECTORY_INDEX(MEM_USER_START);
+    while (pageDirIndex <= PAGE_DIRECTORY_INDEX(MEM_USER_END)) {
+        if (pageDir[pageDirIndex].present == 1) {
+            pte_t *pageTable = (pte_t *) (pageDir[pageDirIndex].pageTableBaseAddr << 12);
+            int pageTableIndex = 0;
+
+            if (pageDirIndex == PAGE_DIRECTORY_INDEX(MEM_USER_END) && 
+                pageTableIndex >= PAGE_TABLE_INDEX(MEM_USER_END)) {
+                break;
+            }
+
+            while (pageTableIndex < NUM_PAGE_TABLE_ENTRIES) {
+                if (pageTable[pageTableIndex].present == 1) {
+                    Free_Page((void *) (pageTable[pageTableIndex].pageBaseAddr << 12));
+                }
+                pageTableIndex++;
+            }
+            Free_Page(pageTable);
+        }
+        pageDirIndex++;
+    }
+
+    Free_Page(pageDir);
+
+    /* Free the context's memory */
+    Free(context);
 }
 
 /*
@@ -94,9 +288,96 @@ int Load_User_Program(char *exeFileData, ulong_t exeFileLength,
      * - Fill in initial stack pointer, argument block address,
      *   and code entry point fields in User_Context
      */
-    TODO_P(PROJECT_VIRTUAL_MEMORY_A,
-           "Load user program into address space");
+    // TODO_P(PROJECT_VIRTUAL_MEMORY_A,
+    //        "Load user program into address space");
+    int i;
+    unsigned numArgs;
+    ulong_t argBlockSize;
+    ulong_t size, argBlockAddr;
+    struct User_Context *userContext = 0;
+
+    /* Create User_Context */
+    userContext = Create_User_Context();
+    if(userContext == 0)
+        return -1;
+    
+    pte_t *originalPageDir = Get_PDBR();
+    Set_PDBR(userContext->pageDir);
+
+    /* Load segment data into memory */
+    for(i = 0; i < exeFormat->numSegments; ++i) {
+        struct Exe_Segment *segment = &exeFormat->segmentList[i];
+        ulong_t copied = 0;
+        ulong_t virtualAddress = (segment->startAddress) + MEM_USER_START;
+        ulong_t offset = virtualAddress % PAGE_SIZE;
+        ulong_t toBeCopied = segment->lengthInFile;
+
+        if (PAGE_ADDR(segment->startAddress) == 0) continue;
+
+        while(toBeCopied > 0) {
+            
+            void *pageAddr = Get_Page_Addr(virtualAddress, userContext->pageDir);
+            int size = toBeCopied > (PAGE_SIZE - offset) ? PAGE_SIZE - offset : toBeCopied;
+            memcpy(pageAddr + offset, exeFileData + segment->offsetInFile + copied, size);
+            Make_Page_Pageable(virtualAddress, userContext->pageDir);
+
+            if ((segment->protFlags & VM_WRITE) == 0) {
+                Make_Page_ReadOnly(virtualAddress, userContext->pageDir);
+            }
+            
+            copied += size;
+            toBeCopied -= size;
+            offset = 0;
+            virtualAddress += size;
+        }
+    }
+
+    Get_Argument_Block_Size(command, &numArgs, &argBlockSize);
+
+    void *pageAddr = Get_Page_Addr(MEM_STACK - argBlockSize, userContext->pageDir);
+    Make_Page_Pageable(MEM_STACK - argBlockSize, userContext->pageDir);
+
+    /* Format argument block */
+    Format_Argument_Block(pageAddr + PAGE_SIZE - argBlockSize, numArgs,
+                          MEM_STACK - argBlockSize - MEM_USER_START, 
+                          command);
+
+    pageAddr = Get_Page_Addr(MEM_STACK - argBlockSize - PAGE_SIZE, userContext->pageDir);
+    Make_Page_Pageable(MEM_STACK - argBlockSize - PAGE_SIZE, userContext->pageDir);
+
+    pageAddr = Get_Page_Addr(MEM_STACK - argBlockSize - PAGE_SIZE * 2, userContext->pageDir);
+    Make_Page_Pageable(MEM_STACK - argBlockSize - PAGE_SIZE * 2, userContext->pageDir);
+
+    /* Fill in code entry point */
+    userContext->entryAddr = exeFormat->entryAddr;
+
+    /*
+     * Fill in addresses of argument block and stack
+     * (They happen to be the same)
+     */
+    userContext->argBlockAddr = MEM_STACK - argBlockSize - MEM_USER_START;
+    userContext->stackPointerAddr = MEM_STACK - argBlockSize - MEM_USER_START;
+
+    *pUserContext = userContext;
+
+    Set_PDBR(originalPageDir);
+
     return 0;
+}
+
+bool Validate_User_Memory(struct User_Context * userContext,
+                          ulong_t userAddr, ulong_t bufSize,
+                          int for_writing) {
+    ulong_t avail;
+    for_writing = for_writing;  /* avoid warning */
+    
+    if (userAddr >= MEM_USER_END - MEM_USER_START) return false;
+
+    avail = (MEM_USER_END - MEM_USER_START) - userAddr;
+    if(bufSize > avail)
+        return false;
+
+    return true;
 }
 
 /*
@@ -123,7 +404,19 @@ bool Copy_From_User(void *destInKernel, ulong_t srcInUser,
      * interrupts are disabled; because no other process can run,
      * the page is guaranteed not to be stolen.
      */
-    TODO_P(PROJECT_VIRTUAL_MEMORY_A, "Copy user data to kernel buffer");
+    // TODO_P(PROJECT_VIRTUAL_MEMORY_A, "Copy user data to kernel buffer");
+    struct User_Context *current = CURRENT_THREAD->userContext;
+
+    if(!Validate_User_Memory(current, srcInUser, numBytes, VUM_READING))
+        return false;
+    pte_t *origPageDir = Get_PDBR();
+    Set_PDBR(current->pageDir);
+    Get_Page_Addr(srcInUser + MEM_USER_START, current->pageDir);
+    memcpy(destInKernel, User_To_Kernel(current, srcInUser), numBytes);
+    Make_Page_Pageable(srcInUser + MEM_USER_START, current->pageDir);
+    Set_PDBR(origPageDir);
+
+    return true;
 }
 
 /*
@@ -138,7 +431,19 @@ bool Copy_To_User(ulong_t destInUser, const void *srcInKernel,
      * - Also, make sure the memory is mapped into the user
      *   address space with write permission enabled
      */
-    TODO_P(PROJECT_VIRTUAL_MEMORY_A, "Copy kernel data to user buffer");
+    // TODO_P(PROJECT_VIRTUAL_MEMORY_A, "Copy kernel data to user buffer");
+    struct User_Context *current = CURRENT_THREAD->userContext;
+
+    if(!Validate_User_Memory(current, destInUser, numBytes, VUM_WRITING))
+        return false;
+    pte_t *origPageDir = Get_PDBR();
+    Set_PDBR(current->pageDir);
+    Get_Page_Addr(destInUser + MEM_USER_START, current->pageDir);
+    memcpy(User_To_Kernel(current, destInUser), srcInKernel, numBytes);
+    Make_Page_Pageable(destInUser + MEM_USER_START, current->pageDir);
+    Set_PDBR(origPageDir);
+
+    return true;
 }
 
 
@@ -151,6 +456,19 @@ void Switch_To_Address_Space(struct User_Context *userContext) {
      *   segments, switch to the process's LDT
      * - 
      */
-    TODO_P(PROJECT_VIRTUAL_MEMORY_A,
-           "Switch_To_Address_Space() using paging");
+    // TODO_P(PROJECT_VIRTUAL_MEMORY_A,
+    //        "Switch_To_Address_Space() using paging");
+    ushort_t ldtSelector;
+
+    /* Eager check to ensure that the new address space
+       has either memory (userseg) or a page directory 
+       (uservm) and is not likely to abort */
+    KASSERT(userContext->memory || userContext->pageDir);
+
+    /* Switch to the LDT of the new user context */
+    ldtSelector = userContext->ldtSelector;
+    __asm__ __volatile__("lldt %0"::"a"(ldtSelector)
+        );
+
+    Set_PDBR(userContext->pageDir);
 }

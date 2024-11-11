@@ -234,7 +234,7 @@ void Init_VM(struct Boot_Info *bootInfo) {
     apicPageTable[ioApicTableIndex].flags = VM_WRITE | VM_READ;
     apicPageTable[ioApicTableIndex].pageBaseAddr = PAGE_ALIGNED_ADDR(ioApicBaseAddr);
 
-    ((pte_t *)PAGE_ORIG(pageDir[0].pageTableBaseAddr))[0].present = 0;
+    ((pte_t *)PAGE_LEFT(pageDir[0].pageTableBaseAddr))[0].present = 0;
 
     Enable_Paging(pageDir);
     Install_Interrupt_Handler(14, Page_Fault_Handler);
