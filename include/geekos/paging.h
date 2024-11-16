@@ -36,6 +36,15 @@ struct User_Context;
 #define PAGE_ADDR(x)   (PAGE_ALIGNED_ADDR(x) << 12)
 #define PAGE_LEFT(x) ((unsigned int)(x) << 12)
 
+#define MEM_KERNEL_START 0x00000000
+#define MEM_USER_START   0x80000000
+#define MEM_TEXT         0x80001000
+#define MEM_STACK        0xF0000000
+#define MEM_USER_END     0xF0000000
+#define MEM_APICIO       0xFEC00000
+#define MEM_APIC         0xFEE00000
+#define MEM_END          0xFFFFFFFF
+
 /*
  * Bits for flags field of pde_t and pte_t.
  */
@@ -77,6 +86,13 @@ typedef struct {
     uint_t kernelInfo:3;
     uint_t pageBaseAddr:20;
 } pte_t;
+
+/*page file*/
+typedef struct {
+    bool notfree[256];
+    struct Block_Device *dev;    
+    ulong_t startSector;
+} pagefile;
 
 /*
  * Datatype representing the hardware error code
@@ -135,5 +151,9 @@ bool Is_Mmaped_Page(struct User_Context *context, ulong_t vaddr);
 void Write_Out_Mmaped_Page(struct User_Context *context, ulong_t vaddr);
 
 extern const pde_t *Kernel_Page_Dir(void);
+
+void *Get_Page_Addr(ulong_t virtualAddress, pde_t *pageDir);
+void Make_Page_Pageable(ulong_t virtualAddress, pde_t *pageDir);
+void Make_Page_ReadOnly(ulong_t virtualAddress, pde_t *pageDir);
 
 #endif

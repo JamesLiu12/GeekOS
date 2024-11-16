@@ -1,4 +1,4 @@
-BSS = 4c888
+BSS = 4c8a8
 start kern info = 90000
 Creating kernel heap: start=102000, size=1048576
 527232KB memory detected, 130362 pages in freelist, 1048576 bytes in kernel heap

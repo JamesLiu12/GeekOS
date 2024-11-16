@@ -34,15 +34,6 @@ extern Spin_Lock_t kthreadLock;
 int userDebug = 0;
 #define Debug(args...) if (userDebug) Print("uservm: " args)
 
-#define MEM_KERNEL_START 0x00000000
-#define MEM_USER_START   0x80000000
-#define MEM_TEXT         0x80001000
-#define MEM_STACK        0xF0000000
-#define MEM_USER_END     0xF0000000
-#define MEM_APICIO       0xFEC00000
-#define MEM_APIC         0xFEE00000
-#define MEM_END          0xFFFFFFFF
-
 /* ----------------------------------------------------------------------
  * Private functions
  * ---------------------------------------------------------------------- */
@@ -52,71 +43,6 @@ void *User_To_Kernel(struct User_Context *userContext, ulong_t userPtr) {
     uchar_t *userBase = (uchar_t *) userContext->memory;
 
     return (void *)(userBase + userPtr);
-}
-
-void *Get_Page_Addr(ulong_t virtualAddress, pde_t *pageDir) {
-    int pageDirIndex = PAGE_DIRECTORY_INDEX(virtualAddress);
-    int pageTblIndex = PAGE_TABLE_INDEX(virtualAddress);
-
-
-    if (pageDir[pageDirIndex].present == 0) {
-        pte_t *pageTbl = Alloc_Page(); 
-        if (pageTbl == 0) Exit(-1);
-        memset(pageTbl, 0, PAGE_SIZE);
-        pageDir[pageDirIndex].present = 1;
-        pageDir[pageDirIndex].flags = VM_USER | VM_WRITE | VM_READ;
-        pageDir[pageDirIndex].pageTableBaseAddr = PAGE_ALIGNED_ADDR(pageTbl);
-    } 
-
-    pte_t *pageTbl = PAGE_LEFT(pageDir[pageDirIndex].pageTableBaseAddr);
-
-    if (pageTbl[pageTblIndex].present == 0) {
-        void *pageAddr = Alloc_Pageable_Page(&pageTbl[pageTblIndex], PAGE_ADDR(virtualAddress));
-        if (pageAddr == 0) Exit(-1);
-        memset(pageAddr, 0, PAGE_SIZE);
-        pageTbl[pageTblIndex].present = 1;
-        pageTbl[pageTblIndex].flags = VM_USER | VM_WRITE | VM_READ;
-        pageTbl[pageTblIndex].pageBaseAddr = PAGE_ALIGNED_ADDR(pageAddr);
-    }
-
-    Disable_Interrupts();
-
-    void *pageAddress = PAGE_LEFT(pageTbl[pageTblIndex].pageBaseAddr);
-
-    struct Page *page = Get_Page(pageAddress);                
-    page->flags &= ~(PAGE_PAGEABLE);
-
-    Enable_Interrupts();
-
-    return pageAddress;
-}
-
-void Make_Page_Pageable(ulong_t virtualAddress, pde_t *pageDir) {
-    int pageDirIndex = PAGE_DIRECTORY_INDEX(virtualAddress);
-    int pageTableIndex = PAGE_TABLE_INDEX(virtualAddress);
-
-    Disable_Interrupts();
-
-    pte_t *pageTbl = PAGE_LEFT(pageDir[pageDirIndex].pageTableBaseAddr);
-    ulong_t pageAddress = PAGE_LEFT(pageTbl[pageTableIndex].pageBaseAddr);
-    struct Page *page = Get_Page(pageAddress);
-    page->flags |= PAGE_PAGEABLE;
-
-    Enable_Interrupts();
-}
-
-void Make_Page_ReadOnly(ulong_t virtualAddress, pde_t *pageDir) {
-    int pageDirIndex = PAGE_DIRECTORY_INDEX(virtualAddress);
-    int pageTableIndex = PAGE_TABLE_INDEX(virtualAddress);
-
-    Disable_Interrupts();
-
-    pte_t *pageTbl = PAGE_LEFT(pageDir[pageDirIndex].pageTableBaseAddr);
-    ulong_t pageAddress = PAGE_LEFT(pageTbl[pageTableIndex].pageBaseAddr);
-    struct Page *page = Get_Page(pageAddress);
-    page->flags &= ~(VM_WRITE);
-
-    Enable_Interrupts();
 }
 
 extern struct User_Context *Create_User_Context() {
@@ -357,6 +283,8 @@ int Load_User_Program(char *exeFileData, ulong_t exeFileLength,
      */
     userContext->argBlockAddr = MEM_STACK - argBlockSize - MEM_USER_START;
     userContext->stackPointerAddr = MEM_STACK - argBlockSize - MEM_USER_START;
+
+    userContext->stackLimit = MEM_STACK - PAGE_SIZE * 3;
 
     *pUserContext = userContext;
 

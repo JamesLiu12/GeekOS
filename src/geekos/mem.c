@@ -371,6 +371,20 @@ static void *Alloc_Or_Reclaim_Page(pte_t * entry, ulong_t vaddr,
         Lock_Page(page);
         TODO_P(PROJECT_VIRTUAL_MEMORY_B,
                "write page out to backing storage");
+        // int index = Find_Space_On_Paging_File();
+        // if (index > 0) {
+        //     Write_To_Paging_File(paddr, page->vaddr, index);
+        //     if (page->flags & PAGE_ALLOCATED) {
+        //         page->entry->present = 0;
+        //         page->entry->kernelInfo = KINFO_PAGE_ON_DISK;
+        //         page->entry->pageBaseAddr = index;
+        //     } else {
+        //         Free_Space_On_Paging_File(index);
+        //         page->flags |= PAGE_ALLOCATED;
+        //     }
+        //     Flush_TLB();
+        // }
+        
         TODO_P(PROJECT_MMAP, "write page out to backing storage");
 
 
