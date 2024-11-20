@@ -65,10 +65,14 @@ const pde_t *Kernel_Page_Dir(void) {
 void *Get_Page_Addr(ulong_t virtualAddress, pde_t *pageDir) {
     int pageDirIndex = PAGE_DIRECTORY_INDEX(virtualAddress);
     int pageTblIndex = PAGE_TABLE_INDEX(virtualAddress);
-
+    int originalIntteruptEnabled = Interrupts_Enabled();
 
     if (pageDir[pageDirIndex].present == 0) {
+        if (!Interrupts_Enabled()) Enable_Interrupts();
+        // Print("Interrupts_Enabled: %d\n", Interrupts_Enabled());
+        Print("PageDir not present\n");
         pte_t *pageTbl = Alloc_Page(); 
+        Print("Ällocted pageTbl: %p\n", pageTbl);
         if (pageTbl == 0) Exit(-1);
         memset(pageTbl, 0, PAGE_SIZE);
         pageDir[pageDirIndex].present = 1;
@@ -79,7 +83,11 @@ void *Get_Page_Addr(ulong_t virtualAddress, pde_t *pageDir) {
     pte_t *pageTbl = PAGE_LEFT(pageDir[pageDirIndex].pageTableBaseAddr);
 
     if (pageTbl[pageTblIndex].present == 0) {
+        if (!Interrupts_Enabled()) Enable_Interrupts();
+        // Print("Interrupts_Enabled: %d\n", Interrupts_Enabled());
+        Print("Page not present\n");
         void *pageAddr = Alloc_Pageable_Page(&pageTbl[pageTblIndex], PAGE_ADDR(virtualAddress));
+        Print("Allocated pageAddr: %p\n", pageAddr);
         if (pageAddr == 0) Exit(-1);
         memset(pageAddr, 0, PAGE_SIZE);
         pageTbl[pageTblIndex].present = 1;
@@ -87,14 +95,14 @@ void *Get_Page_Addr(ulong_t virtualAddress, pde_t *pageDir) {
         pageTbl[pageTblIndex].pageBaseAddr = PAGE_ALIGNED_ADDR(pageAddr);
     }
 
-    Disable_Interrupts();
+    if (Interrupts_Enabled()) Disable_Interrupts();
 
     void *pageAddress = PAGE_LEFT(pageTbl[pageTblIndex].pageBaseAddr);
 
     struct Page *page = Get_Page(pageAddress);                
     page->flags &= ~(PAGE_PAGEABLE);
 
-    Enable_Interrupts();
+    if (originalIntteruptEnabled) Enable_Interrupts();
 
     return pageAddress;
 }
@@ -103,28 +111,28 @@ void Make_Page_Pageable(ulong_t virtualAddress, pde_t *pageDir) {
     int pageDirIndex = PAGE_DIRECTORY_INDEX(virtualAddress);
     int pageTableIndex = PAGE_TABLE_INDEX(virtualAddress);
 
-    Disable_Interrupts();
+    // Disable_Interrupts();
 
     pte_t *pageTbl = PAGE_LEFT(pageDir[pageDirIndex].pageTableBaseAddr);
     ulong_t pageAddress = PAGE_LEFT(pageTbl[pageTableIndex].pageBaseAddr);
     struct Page *page = Get_Page(pageAddress);
     page->flags |= PAGE_PAGEABLE;
 
-    Enable_Interrupts();
+    // Enable_Interrupts();
 }
 
 void Make_Page_ReadOnly(ulong_t virtualAddress, pde_t *pageDir) {
     int pageDirIndex = PAGE_DIRECTORY_INDEX(virtualAddress);
     int pageTableIndex = PAGE_TABLE_INDEX(virtualAddress);
 
-    Disable_Interrupts();
+    // Disable_Interrupts();
 
     pte_t *pageTbl = PAGE_LEFT(pageDir[pageDirIndex].pageTableBaseAddr);
     ulong_t pageAddress = PAGE_LEFT(pageTbl[pageTableIndex].pageBaseAddr);
     struct Page *page = Get_Page(pageAddress);
     page->flags &= ~(VM_WRITE);
 
-    Enable_Interrupts();
+    // Enable_Interrupts();
 }
 
 /*
@@ -194,21 +202,24 @@ union type_pun_workaround {
     pte_t *pageTbl = PAGE_LEFT(pageDir[pageDirIndex].pageTableBaseAddr);
     struct User_Context *curUserContext = CURRENT_THREAD->userContext;
 
+    Print("address: %p\n", address);
+    Print("curUserContext->stackLimit: %p\n", curUserContext->stackLimit);
+    Print("curUserContext->stackLimit - PAGE_SIZE: %p\n", curUserContext->stackLimit - PAGE_SIZE);
     if (address < curUserContext->stackLimit && address > curUserContext->stackLimit - PAGE_SIZE) {
+        Print("Stack growth\n");
+        // Print("Interrupts_Enabled: %d\n", Interrupts_Enabled());
         ulong_t pageAddr = Get_Page_Addr(address, pageDir);
+        Print("pageAddr: %p\n", pageAddr);
         Make_Page_Pageable(address, pageDir);
+        Print("Made page pageable\n");
+        // Print("Make_Page_Pageable\n");
         curUserContext->stackLimit = curUserContext->stackLimit - PAGE_SIZE;
+        Print("curUserContext->stackLimit2: %p\n", curUserContext->stackLimit);
         return;
     } 
-    // else if (pageTbl[pageTblIndex].kernelInfo == KINFO_PAGE_ON_DISK) {
-    //     int pagefileIndex = pageTbl[pageTblIndex].pageBaseAddr;
-    //     ulong_t pageAddr = Get_Page_Addr(address, curUserContext->pageDir);  
-    //     Enable_Interrupts(); 
-    //     Read_From_Paging_File(pageAddr, address, pagefileIndex);
-    //     Disable_Interrupts();
-    //     pageTbl[pageTblIndex].kernelInfo = 0;
-    //     Make_Page_Pageable(address, curUserContext->pageDir);
-    //     Free_Space_On_Paging_File(pagefileIndex);
+    // else if (address >= curUserContext->stackLimit) {
+    //     ulong_t pageAddr = Get_Page_Addr(address, pageDir);
+    //     Make_Page_Pageable(address, pageDir);
     //     return;
     // }
 
@@ -340,12 +351,6 @@ void Init_Secondary_VM() {
 void Init_Paging(void) {
     TODO_P(PROJECT_VIRTUAL_MEMORY_B,
            "Initialize paging file data structures");
-    // struct Paging_Device *pagingDevice = Get_Paging_Device();
-    // int index;
-    // pageFile = Malloc(sizeof(pagefile));
-    // memset(pageFile->notfree, 0, 256 * sizeof(bool));
-    // pageFile->dev = pagingDevice->dev;
-    // pageFile->startSector = pagingDevice->startSector;
 }
 
 /* guards your structure for tracking free space on the paging file. */
@@ -362,15 +367,6 @@ int Find_Space_On_Paging_File(void) {
     int iflag = Begin_Int_Atomic();
     Spin_Lock(&s_free_space_spin_lock);
     TODO_P(PROJECT_VIRTUAL_MEMORY_B, "Find free page in paging file");
-    // retval = -1;
-    // int i;
-    // for (i = 0; i < 256; i++) {
-    //     if (!pageFile->notfree[i]) {
-    //         pageFile->notfree[i] = 1;
-    //         retval = i * SECTORS_PER_PAGE;
-    //         break;
-    //     }
-    // }
     retval = EUNSUPPORTED;
     Spin_Unlock(&s_free_space_spin_lock);
     End_Int_Atomic(iflag);
@@ -404,13 +400,6 @@ void Write_To_Paging_File(void *paddr, ulong_t vaddr, int pagefileIndex) {
     KASSERT(!(page->flags & PAGE_PAGEABLE));    /* Page must be pageable! */
     KASSERT(page->flags & PAGE_LOCKED); /* Page must be locked! */
     TODO_P(PROJECT_VIRTUAL_MEMORY_B, "Write page data to paging file");
-    // int i;
-    // for (i = 0; i < SECTORS_PER_PAGE; i++) {
-    //     Block_Write(pageFile->dev,
-    //                 pageFile->startSector + pagefileIndex + i,
-    //                 paddr + i * SECTOR_SIZE);
-    // }
-    // pageFile->notfree[pagefileIndex/SECTORS_PER_PAGE] = 1; 
 }
 
 /**
@@ -426,12 +415,6 @@ void Read_From_Paging_File(void *paddr, ulong_t vaddr, int pagefileIndex) {
     struct Page *page = Get_Page((ulong_t) paddr);
     KASSERT(!(page->flags & PAGE_PAGEABLE));    /* Page must be locked! */
     TODO_P(PROJECT_VIRTUAL_MEMORY_B, "Read page data from paging file");
-    // int i;
-    // for (i = 0; i < SECTORS_PER_PAGE; i++) {
-    //     Block_Read(pageFile->dev, 
-    //                pageFile->startSector + pagefileIndex + i,
-    //                paddr + i * SECTOR_SIZE);
-    // }
 }
 
 

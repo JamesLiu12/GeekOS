@@ -241,7 +241,6 @@ int Load_User_Program(char *exeFileData, ulong_t exeFileLength,
         if (PAGE_ADDR(segment->startAddress) == 0) continue;
 
         while(toBeCopied > 0) {
-            
             void *pageAddr = Get_Page_Addr(virtualAddress, userContext->pageDir);
             int size = toBeCopied > (PAGE_SIZE - offset) ? PAGE_SIZE - offset : toBeCopied;
             memcpy(pageAddr + offset, exeFileData + segment->offsetInFile + copied, size);
