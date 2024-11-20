@@ -388,7 +388,6 @@ clean :
 		(cd $$d && rm -f *.bin *.exe *.o *.s *.a); \
 	done
 	rm -f libc/errno.c geekos/kernel.syms geekos/hdbootsect
-	rm -f *.img qemu out.txt core
 	rm -f tools/gfs2f pagefile.bin
 	rm -rf tools/*.dSYM # mac
 	./cleanSymLinks.py

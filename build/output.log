@@ -1,7 +1,7 @@
-BSS = 4c888
+BSS = 4e888
 start kern info = 90000
 Creating kernel heap: start=102000, size=1048576
-527232KB memory detected, 130362 pages in freelist, 1048576 bytes in kernel heap
+527232KB memory detected, 130360 pages in freelist, 1048576 bytes in kernel heap
 Initializing IDT...
 Init_SMP
 Initializing SMP...
@@ -15,12 +15,39 @@ Initializing keyboard...
 Initializing DMA Controller...
 Initializing IDE controller...
 ide: probe found ATA drive:     ide0: cyl=40, heads=16, sectors=63
-ide: found no drive 1
+ide: probe found ATA drive:     ide1: cyl=20, heads=16, sectors=63
 the global lock is not held.
 Registering paging device: /c/pagefile.bin on ide0 with 10240 sectors
 Mounted /c filesystem!
 Welcome to GeekOS!
 Spawning init process (/c/shell.exe)
-$ exit[25;6ft[25;6ft
-DONE!
-Init process exited with code 0
+$ gfs3tst 16
+Task index is 16.
+Invoking preliminary mount
+GFS3_Mount
+Mount returned 0.
+preliminary mount apparently successful
+GFS3_Disk_Properties
+Retrieved disk parameters, blocksize 20480, blocks 2048
+Testing: Basic Seek...GFS3_Open
+blockNum - inode->extents[i].start_block: 0
+dirent->name: .
+dirent->name_length: 1
+dirent->name: ..
+dirent->name_length: 2
+dirent->name: somefile
+dirent->name_length: 8
+dirent->name: somedir
+dirent->name_length: 7
+dirent->name: basic
+dirent->name_length: 5
+dirent->name: basic7f
+dirent->name_length: 7
+found
+Sys_Seek
+GFS3_Seek
+Sys_Seek
+GFS3_Seek
+GFS3_Close
+PASSED (1) crt score: 2 
+$ 

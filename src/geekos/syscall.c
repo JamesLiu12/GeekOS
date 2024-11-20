@@ -454,8 +454,9 @@ static int Sys_Mount(struct Interrupt_State *state) {
      * and invoke the Mount() VFS function.  You will need to check
      * to make sure they are correctly nul-terminated.
      */
-    TODO_P(PROJECT_FS, "Mount system call");
-    rc = EUNSUPPORTED;
+    // TODO_P(PROJECT_FS, "Mount system call");
+    // rc = EUNSUPPORTED;
+    rc = Mount(args->devname, args->prefix, args->fstype);
   done:
     if(args != 0)
         Free(args);
@@ -547,8 +548,22 @@ static int Sys_Open(struct Interrupt_State *state) {
  *   or an error code (< 0) if unsuccessful
  */
 static int Sys_OpenDirectory(struct Interrupt_State *state) {
-    TODO_P(PROJECT_FS, "Open directory system call");
-    return EUNSUPPORTED;
+    Print("Sys_OpenDirectory\n");
+    // TODO_P(PROJECT_FS, "Open directory system call");
+
+    char *path;
+    int rc = get_path_from_registers(state->ebx, state->ecx, &path);
+    if(rc != 0) return rc;
+
+    rc = next_descriptor();
+    if(rc < 0) return rc;
+
+    struct File *file;
+    rc = Open_Directory(path, &file);
+    Free(path);
+
+    return rc >= 0 ? add_file_to_descriptor_table(file) : rc;
+    // return EUNSUPPORTED;
 }
 
 /*
@@ -680,8 +695,30 @@ static int Sys_Read(struct Interrupt_State *state) {
  * Returns: 0 if successful, error code (< 0) if unsuccessful
  */
 static int Sys_ReadEntry(struct Interrupt_State *state) {
-    TODO_P(PROJECT_FS, "ReadEntry system call");
-    return EUNSUPPORTED;
+    Print("Sys_ReadEntry\n");
+    // TODO_P(PROJECT_FS, "ReadEntry system call");
+    if(state->ebx > USER_MAX_FILES) return EINVALID;
+
+    if(CURRENT_THREAD->userContext->file_descriptor_table[state->ebx]) {
+        void *buffer = Malloc(sizeof(struct VFS_Dir_Entry));
+        if(!buffer) return ENOMEM;
+
+        int bytesRead = Read_Entry(CURRENT_THREAD->userContext->file_descriptor_table[state->ebx], buffer);
+
+        if(bytesRead < 0) {
+            Free(buffer);
+            return bytesRead;
+        }
+
+        if (!Copy_To_User(state->ecx, buffer, sizeof(struct VFS_Dir_Entry))) {
+            Free(buffer);
+            return EINVALID;
+        }
+        Free(buffer);
+        return bytesRead;
+    }
+    return ENOTFOUND;
+    // return EUNSUPPORTED;
 }
 
 /*
@@ -730,8 +767,16 @@ static int Sys_Write(struct Interrupt_State *state) {
  * Returns: 0 if successful, error code (< 0) if unsuccessful
  */
 static int Sys_Stat(struct Interrupt_State *state) {
-    TODO_P(PROJECT_FS, "Stat system call");
-    return EUNSUPPORTED;
+    Print("Sys_Stat\n");
+    // TODO_P(PROJECT_FS, "Stat system call");
+    char *path;
+    int rc = get_path_from_registers(state->ebx, state->ecx, &path);
+    struct VFS_File_Stat fileStat;
+    rc = Stat(path, &fileStat);
+    Free(path);
+
+    return rc == 0 ? !Copy_To_User(state->edx, &fileStat, sizeof(struct VFS_File_Stat)) ? EINVALID : 0 : rc;
+    // return EUNSUPPORTED;
 }
 
 /*
@@ -743,8 +788,18 @@ static int Sys_Stat(struct Interrupt_State *state) {
  * Returns: 0 if successful, error code (< 0) if unsuccessful
  */
 static int Sys_FStat(struct Interrupt_State *state) {
-    TODO_P(PROJECT_FS, "FStat system call");
-    return EUNSUPPORTED;
+    Print("Sys_FStat\n");
+    // TODO_P(PROJECT_FS, "FStat system call");
+    if(state->ebx > USER_MAX_FILES) return EINVALID;
+    
+    int rc;
+    if(CURRENT_THREAD->userContext->file_descriptor_table[state->ebx]) {
+        struct VFS_File_Stat fileStat;
+        rc = FStat( CURRENT_THREAD->userContext->file_descriptor_table[state->ebx], &fileStat);
+        return rc == 0 ? !Copy_To_User(state->ecx, &fileStat, sizeof(struct VFS_File_Stat)) ? EINVALID : 0 : rc;
+    }
+    return ENOTFOUND;
+    // return EUNSUPPORTED;
 }
 
 /*
@@ -756,8 +811,13 @@ static int Sys_FStat(struct Interrupt_State *state) {
  * Returns: 0 if successful, error code (< 0) if unsuccessful
  */
 static int Sys_Seek(struct Interrupt_State *state) {
-    TODO_P(PROJECT_FS, "Seek system call");
-    return EUNSUPPORTED;
+    Print("Sys_Seek\n");
+    // TODO_P(PROJECT_FS, "Seek system call");
+    if(state->ebx > USER_MAX_FILES) return EINVALID;
+
+    return CURRENT_THREAD->userContext->file_descriptor_table[state->ebx] ? 
+    Seek(CURRENT_THREAD->userContext->file_descriptor_table[state->ebx], state->ecx) : ENOTFOUND;
+    // return EUNSUPPORTED;
 }
 
 /*
