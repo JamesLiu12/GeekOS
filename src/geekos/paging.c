@@ -70,9 +70,9 @@ void *Get_Page_Addr(ulong_t virtualAddress, pde_t *pageDir) {
     if (pageDir[pageDirIndex].present == 0) {
         if (!Interrupts_Enabled()) Enable_Interrupts();
         // Print("Interrupts_Enabled: %d\n", Interrupts_Enabled());
-        Print("PageDir not present\n");
+        // Print("PageDir not present\n");
         pte_t *pageTbl = Alloc_Page(); 
-        Print("Ällocted pageTbl: %p\n", pageTbl);
+        // Print("Ällocted pageTbl: %p\n", pageTbl);
         if (pageTbl == 0) Exit(-1);
         memset(pageTbl, 0, PAGE_SIZE);
         pageDir[pageDirIndex].present = 1;
@@ -85,9 +85,9 @@ void *Get_Page_Addr(ulong_t virtualAddress, pde_t *pageDir) {
     if (pageTbl[pageTblIndex].present == 0) {
         if (!Interrupts_Enabled()) Enable_Interrupts();
         // Print("Interrupts_Enabled: %d\n", Interrupts_Enabled());
-        Print("Page not present\n");
+        // Print("Page not present\n");
         void *pageAddr = Alloc_Pageable_Page(&pageTbl[pageTblIndex], PAGE_ADDR(virtualAddress));
-        Print("Allocated pageAddr: %p\n", pageAddr);
+        // Print("Allocated pageAddr: %p\n", pageAddr);
         if (pageAddr == 0) Exit(-1);
         memset(pageAddr, 0, PAGE_SIZE);
         pageTbl[pageTblIndex].present = 1;
@@ -194,34 +194,31 @@ union type_pun_workaround {
     faultCode = tpw.faultCode;
     faultCode = *((faultcode_t *) &(state->errorCode));
 
+    pde_t *userPageDir = CURRENT_THREAD->userContext->pageDir;
+
     /* rest of your handling code here */
     // TODO_P(PROJECT_VIRTUAL_MEMORY_B, "handle page faults");
 
     int pageDirIndex = PAGE_DIRECTORY_INDEX(address);
     int pageTblIndex = PAGE_TABLE_INDEX(address);
-    pte_t *pageTbl = PAGE_LEFT(pageDir[pageDirIndex].pageTableBaseAddr);
+    pte_t *pageTbl = PAGE_LEFT(userPageDir[pageDirIndex].pageTableBaseAddr);
     struct User_Context *curUserContext = CURRENT_THREAD->userContext;
 
-    Print("address: %p\n", address);
-    Print("curUserContext->stackLimit: %p\n", curUserContext->stackLimit);
-    Print("curUserContext->stackLimit - PAGE_SIZE: %p\n", curUserContext->stackLimit - PAGE_SIZE);
-    if (address < curUserContext->stackLimit && address > curUserContext->stackLimit - PAGE_SIZE) {
-        Print("Stack growth\n");
+    // Print("address: %p\n", address);
+    // Print("curUserContext->stackLimit: %p\n", curUserContext->stackLimit);
+    // Print("curUserContext->stackLimit - PAGE_SIZE: %p\n", curUserContext->stackLimit - PAGE_SIZE);
+    if (address < curUserContext->stackLimit && address > curUserContext->stackLimit - PAGE_SIZE && faultCode.writeFault) {
+        // Print("Stack growth\n");
         // Print("Interrupts_Enabled: %d\n", Interrupts_Enabled());
-        ulong_t pageAddr = Get_Page_Addr(address, pageDir);
-        Print("pageAddr: %p\n", pageAddr);
-        Make_Page_Pageable(address, pageDir);
-        Print("Made page pageable\n");
+        ulong_t pageAddr = Get_Page_Addr(address, userPageDir);
+        // Print("pageAddr: %p\n", pageAddr);
+        Make_Page_Pageable(address, userPageDir);
+        // Print("Made page pageable\n");
         // Print("Make_Page_Pageable\n");
         curUserContext->stackLimit = curUserContext->stackLimit - PAGE_SIZE;
-        Print("curUserContext->stackLimit2: %p\n", curUserContext->stackLimit);
+        // Print("curUserContext->stackLimit2: %p\n", curUserContext->stackLimit);
         return;
     } 
-    // else if (address >= curUserContext->stackLimit) {
-    //     ulong_t pageAddr = Get_Page_Addr(address, pageDir);
-    //     Make_Page_Pageable(address, pageDir);
-    //     return;
-    // }
 
     TODO_P(PROJECT_MMAP, "handle mmap'd page faults");
 

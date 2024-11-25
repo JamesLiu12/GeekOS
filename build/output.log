@@ -1,7 +1,7 @@
-BSS = 4d8a8
+BSS = 4c8a8
 start kern info = 90000
 Creating kernel heap: start=102000, size=1048576
-527232KB memory detected, 130361 pages in freelist, 1048576 bytes in kernel heap
+527232KB memory detected, 130362 pages in freelist, 1048576 bytes in kernel heap
 Initializing IDT...
 Init_SMP
 Initializing SMP...
@@ -22,16 +22,4 @@ Registering paging device: /c/pagefile.bin on ide0 with 10240 sectors
 Mounted /c filesystem!
 Welcome to GeekOS!
 Spawning init process (/c/shell.exe)
-Interrupts_Enabled: 1
-Interrupts_Enabled: 1
-Interrupts_Enabled: 1
-Interrupts_Enabled: 1
-Interrupts_Enabled: 1
-Interrupts_Enabled: 1
-Interrupts_Enabled: 1
-Interrupts_Enabled: 1
-Interrupts_Enabled: 1
-Interrupts_Enabled: 1
-Interrupts_Enabled: 1
-Interrupts_Enabled: 1
 $ 
