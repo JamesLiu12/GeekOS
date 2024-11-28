@@ -69,7 +69,7 @@ void *_Malloc(ulong_t size) {
 struct gfs3_inode *getInode(struct gfs3_instance *instance, gfs3_inodenum inode_num) {
     struct FS_Buffer_Cache *cache = instance->cache;
 
-    // struct FS_Buffer *buffer = NULL;
+    struct FS_Buffer *buffer = NULL;
     struct gfs3_inode *inode = NULL;
     int rc;
 
@@ -83,15 +83,16 @@ struct gfs3_inode *getInode(struct gfs3_instance *instance, gfs3_inodenum inode_
 
     // Print("inode_offset: %d\n", inode_offset);
 
-    // rc = Get_FS_Buffer(cache, inode_block, &buffer);
-    // if (rc != 0) {
-    //     return NULL;
-    // }
-    void *buffer = _Malloc(SECTOR_SIZE);
-    Block_Read(instance->dev, inode_block, buffer);
+    rc = Get_FS_Buffer(cache, inode_block, &buffer);
+    if (rc != 0) {
+        return NULL;
+    }
+    // void *buffer = _Malloc(SECTOR_SIZE);
+    // Block_Read(instance->dev, inode_block, buffer);
 
     // Calculate the exact location of the inode in the block
-    inode = (struct gfs3_inode *)((char *)buffer + inode_offset * sizeof(struct gfs3_inode));
+    inode = (struct gfs3_inode *)((char *)buffer->data + inode_offset * sizeof(struct gfs3_inode));
+    Release_FS_Buffer(cache, buffer);
     return inode;
 }
 
@@ -104,7 +105,7 @@ struct gfs3_inode *getInode(struct gfs3_instance *instance, gfs3_inodenum inode_
  */
 static int GFS3_FStat(struct File *file, struct VFS_File_Stat *stat) {
     // TODO_P(PROJECT_GFS3, "GeekOS filesystem FStat operation");
-    Print("GFS3_FStat\n");
+    // Print("GFS3_FStat\n");
     struct gfs3_file *gfs3File = (struct gfs3_file *)file->fsData;
     struct gfs3_inode *inode = gfs3File->inode;
 
@@ -118,7 +119,7 @@ static int GFS3_FStat(struct File *file, struct VFS_File_Stat *stat) {
  */
 static int GFS3_Read(struct File *file, void *buf, ulong_t numBytes) {
     // TODO_P(PROJECT_GFS3, "GeekOS filesystem read operation");
-    Print("GFS3_Read\n");
+    // Print("GFS3_Read\n");
     ulong_t startPos = file->filePos;
     ulong_t endPos = startPos + numBytes;
     ulong_t bytesRead = 0;
@@ -133,15 +134,9 @@ static int GFS3_Read(struct File *file, void *buf, ulong_t numBytes) {
     for (i = 0; i < GFS3_EXTENTS && bytesRead < numBytes; i++) {
         if (inode->extents[i].start_block == 0) continue;
 
-        // struct FS_Buffer *buffer = NULL;
+        struct FS_Buffer *buffer = NULL;
 
-        // int rc = Get_FS_Buffer(instance->cache, inode->extents[i].start_block, &buffer);
-        // if (rc != 0) {
-        //     file->filePos += bytesRead;
-        //     return bytesRead;
-        // }
-
-        void *buffer = _Malloc(SECTOR_SIZE);
+        // void *buffer = _Malloc(SECTOR_SIZE);
         int blockNum = inode->extents[i].start_block + frontBlockNum;
 
         if (blockNum - inode->extents[i].start_block >= inode->extents[i].length_blocks) {
@@ -149,18 +144,24 @@ static int GFS3_Read(struct File *file, void *buf, ulong_t numBytes) {
             continue;
         }
         int offset = startPos % SECTOR_SIZE;
-        Block_Read(instance->dev, inode->extents[i].start_block, buffer);
+        // Block_Read(instance->dev, inode->extents[i].start_block, buffer);
+        int rc = Get_FS_Buffer(instance->cache, inode->extents[i].start_block, &buffer);
+        if (rc != 0) {
+            file->filePos += bytesRead;
+            return bytesRead;
+        }
 
         for (; blockNum - inode->extents[i].start_block < inode->extents[i].length_blocks;) {
-            Print("bytesRead: %d\n", bytesRead);
+            // Print("bytesRead: %d\n", bytesRead);
             if (bytesRead >= numBytes) {
                 break;
             }
             ulong_t readSize = MIN(numBytes - bytesRead, offset == 0 ? SECTOR_SIZE : SECTOR_SIZE - offset);
-            memcpy((char *)buf + bytesRead, buffer + offset, readSize);
+            memcpy((char *)buf + bytesRead, buffer->data + offset, readSize);
             offset = 0;
             bytesRead += readSize;
         }
+        Release_FS_Buffer(instance->cache, buffer);
     }
 
     file->filePos += bytesRead;
@@ -182,7 +183,7 @@ static int GFS3_Write(struct File *file, void *buf, ulong_t numBytes) {
  */
 static int GFS3_Seek(struct File *file, ulong_t pos) {
     // TODO_P(PROJECT_GFS3, "GeekOS filesystem seek operation");
-    Print("GFS3_Seek\n");
+    // Print("GFS3_Seek\n");
     if (pos > file->endPos || pos < 0) {
         return EUNSPECIFIED;
     }
@@ -196,7 +197,7 @@ static int GFS3_Seek(struct File *file, ulong_t pos) {
  */
 static int GFS3_Close(struct File *file) {
     // TODO_P(PROJECT_GFS3, "GeekOS filesystem close operation");
-    Print("GFS3_Close\n");
+    // Print("GFS3_Close\n");
     struct gfs3_file *gfs3File = (struct gfs3_file *)file->fsData;
     Free(gfs3File);
     return 0;
@@ -219,7 +220,7 @@ static int GFS3_FStat_Directory(struct File *dir,
                                 struct VFS_File_Stat *stat) {
     /* may be unused. */
     // TODO_P(PROJECT_GFS3, "GeekOS filesystem FStat directory operation");
-    Print("GFS3_FStat_Directory\n");
+    // Print("GFS3_FStat_Directory\n");
     struct gfs3_file *gfs3File = (struct gfs3_file *)dir->fsData;
     struct gfs3_inode *inode = gfs3File->inode;
 
@@ -233,7 +234,7 @@ static int GFS3_FStat_Directory(struct File *dir,
  */
 static int GFS3_Close_Directory(struct File *dir) {
     // TODO_P(PROJECT_GFS3, "GeekOS filesystem Close directory operation");
-    Print("GFS3_Close_Directory\n");
+    // Print("GFS3_Close_Directory\n");
     struct gfs3_file *gfs3File = (struct gfs3_file *)dir->fsData;
     Free(gfs3File);
     return 0;
@@ -245,7 +246,7 @@ static int GFS3_Close_Directory(struct File *dir) {
  */
 static int GFS3_Read_Entry(struct File *dir, struct VFS_Dir_Entry *entry) {
     // TODO_P(PROJECT_GFS3, "GeekOS filesystem Read_Entry operation");
-    Print("GFS3_Read_Entry\n");
+    // Print("GFS3_Read_Entry\n");
     struct gfs3_file *gfs3File = (struct gfs3_file *)dir->fsData;
     struct gfs3_instance *instance = (struct gfs3_instance *)dir->mountPoint->fsData;
     struct gfs3_inode *inode = gfs3File->inode;
@@ -257,27 +258,28 @@ static int GFS3_Read_Entry(struct File *dir, struct VFS_Dir_Entry *entry) {
     for (i = 0; i < GFS3_EXTENTS; i++) {
         if (inode->extents[i].start_block == 0) continue;
 
-        // struct FS_Buffer *buffer = _Malloc(sizeof(struct FS_Buffer));
-        // int rc = Get_FS_Buffer(instance->cache, inode->extents[i].start_block, &buffer);
-        // if (rc != 0) {
-        //     return rc;
-        // }
-        void *buffer = _Malloc(SECTOR_SIZE);
+        struct FS_Buffer *buffer = _Malloc(sizeof(struct FS_Buffer));
+        int rc = Get_FS_Buffer(instance->cache, inode->extents[i].start_block, &buffer);
+        if (rc != 0) {
+            return rc;
+        }
+        // void *buffer = _Malloc(SECTOR_SIZE);
         int blockNum = inode->extents[i].start_block;
-        Block_Read(instance->dev, inode->extents[i].start_block, buffer);
+        // Block_Read(instance->dev, inode->extents[i].start_block, buffer);
 
-        struct gfs3_dirent *dirent = (struct gfs3_dirent *)buffer;
+        struct gfs3_dirent *dirent = (struct gfs3_dirent *)buffer->data;
 
         for (; blockNum - inode->extents[i].start_block < inode->extents[i].length_blocks;) {
             int type = getInode(instance, dirent->inum)->type;
 
-            Print("dirent->name: %s\n", dirent->name);
+            // Print("dirent->name: %s\n", dirent->name);
             if (dirent->inum != 0) {
                 if (bytesRead >= filePos) {
                     strncpy(entry->name, dirent->name, MAX_NAME_LEN);
                     entry->name[MAX_NAME_LEN - 1] = '\0';
                     entry->stats.isDirectory = type;
                     dir->filePos += dirent->entry_length;
+                    Release_FS_Buffer(instance->cache, buffer);
                     return 0;
                 }
             }
@@ -289,15 +291,16 @@ static int GFS3_Read_Entry(struct File *dir, struct VFS_Dir_Entry *entry) {
             } 
             else {
                 blockNum++;
-                Block_Read(instance->dev, blockNum, buffer);
-                // int rc = Get_FS_Buffer(instance->cache, inode->extents[i].start_block, &buffer);
-                // if (rc != 0) {
-                //     Free(duplicatedPath);
-                //     return rc;
-                // }
-                dirent = (struct gfs3_dirent *)buffer;
+                // Block_Read(instance->dev, blockNum, buffer);
+                Release_FS_Buffer(instance->cache, buffer);
+                int rc = Get_FS_Buffer(instance->cache, inode->extents[i].start_block, &buffer);
+                if (rc != 0) {
+                    return rc;
+                }
+                dirent = (struct gfs3_dirent *)buffer->data;
             }
         }
+        Release_FS_Buffer(instance->cache, buffer);
     }
 
     return VFS_NO_MORE_DIR_ENTRIES;
@@ -320,7 +323,7 @@ static int GFS3_Read_Entry(struct File *dir, struct VFS_Dir_Entry *entry) {
  */
 static int GFS3_Open(struct Mount_Point *mountPoint, const char *path,
                      int mode, struct File **pFile) {
-    Print("GFS3_Open\n");
+    // Print("GFS3_Open\n");
     // TODO_P(PROJECT_GFS3, "GeekOS filesystem open operation");
 
     struct gfs3_instance *instance = (struct gfs3_instance *)mountPoint->fsData;
@@ -360,29 +363,29 @@ static int GFS3_Open(struct Mount_Point *mountPoint, const char *path,
         for (i = 0; i < GFS3_EXTENTS; i++) {
             if (inode->extents[i].start_block == 0) continue;
 
-            // struct FS_Buffer *buffer = NULL;
+            struct FS_Buffer *buffer = NULL;
 
-            // int rc = Get_FS_Buffer(instance->cache, inode->extents[i].start_block, &buffer);
-            // if (rc != 0) {
-            //     Free(duplicatedPath);
-            //     return rc;
-            // }
-            void *buffer = _Malloc(SECTOR_SIZE);
+            int rc = Get_FS_Buffer(instance->cache, inode->extents[i].start_block, &buffer);
+            if (rc != 0) {
+                Free(duplicatedPath);
+                return rc;
+            }
+            // void *buffer = _Malloc(SECTOR_SIZE);
             int blockNum = inode->extents[i].start_block;
-            Block_Read(mountPoint->dev, inode->extents[i].start_block, buffer);
+            // Block_Read(mountPoint->dev, inode->extents[i].start_block, buffer);
 
             // void *startAddr = buffer;
-            dirent = (struct gfs3_dirent *)buffer;
+            dirent = (struct gfs3_dirent *)buffer->data;
 
-            Print("blockNum - inode->extents[i].start_block: %d\n", blockNum - inode->extents[i].start_block);
+            // Print("blockNum - inode->extents[i].start_block: %d\n", blockNum - inode->extents[i].start_block);
             for (; blockNum - inode->extents[i].start_block < inode->extents[i].length_blocks;) {
-                Print("dirent->name: %s\n", dirent->name);
-                Print("dirent->name_length: %d\n", dirent->name_length);
+                // Print("dirent->name: %s\n", dirent->name);
+                // Print("dirent->name_length: %d\n", dirent->name_length);
                 // Print("dirent: %d\n", (char *)dirent);
                 // Print("dirent->inum: %d\n", dirent->inum);
                 if (dirent->inum != 0) {
                     if (strncmp(dirent->name, name, strlen(name)) == 0 && dirent->name_length == strlen(name)) {
-                        Print("found\n");
+                        // Print("found\n");
                         inodenum = dirent->inum;
                         found = true;
                         break;
@@ -396,15 +399,17 @@ static int GFS3_Open(struct Mount_Point *mountPoint, const char *path,
                 } 
                 else {
                     blockNum++;
-                    Block_Read(mountPoint->dev, blockNum, buffer);
-                    // int rc = Get_FS_Buffer(instance->cache, inode->extents[i].start_block, &buffer);
-                    // if (rc != 0) {
-                    //     Free(duplicatedPath);
-                    //     return rc;
-                    // }
-                    dirent = (struct gfs3_dirent *)buffer;
+                    // Block_Read(mountPoint->dev, blockNum, buffer);
+                    Release_FS_Buffer(instance->cache, buffer);
+                    int rc = Get_FS_Buffer(instance->cache, inode->extents[i].start_block, &buffer);
+                    if (rc != 0) {
+                        Free(duplicatedPath);
+                        return rc;
+                    }
+                    dirent = (struct gfs3_dirent *)buffer->data;
                 }
             }
+            Release_FS_Buffer(instance->cache, buffer);
         }
 
         if (!found) {
@@ -458,7 +463,7 @@ static int GFS3_Create_Directory(struct Mount_Point *mountPoint,
 static int GFS3_Open_Directory(struct Mount_Point *mountPoint,
                                const char *path, struct File **pDir) {
     // TODO_P(PROJECT_GFS3, "GeekOS filesystem open directory operation");
-    Print("GFS3_Open_Directory\n");
+    // Print("GFS3_Open_Directory\n");
     struct gfs3_instance *instance = (struct gfs3_instance *)mountPoint->fsData;
     int blockNum = instance->sb->block_with_inode_zero;
     gfs3_inodenum inodenum = GFS3_INUM_ROOT;
@@ -495,30 +500,29 @@ static int GFS3_Open_Directory(struct Mount_Point *mountPoint,
         for (i = 0; i < GFS3_EXTENTS; i++) {
             if (inode->extents[i].start_block == 0) continue;
 
-            // struct FS_Buffer *buffer = NULL;
+            struct FS_Buffer *buffer = NULL;
 
-            instance->cache = Create_FS_Buffer_Cache(mountPoint->dev, SECTOR_SIZE);
-            // int rc = Get_FS_Buffer(instance->cache, inode->extents[i].start_block, &buffer);
-            // if (rc != 0) {
-            //     Free(duplicatedPath);
-            //     return rc;
-            // }
-            void *buffer = _Malloc(SECTOR_SIZE);
+            int rc = Get_FS_Buffer(instance->cache, inode->extents[i].start_block, &buffer);
+            if (rc != 0) {
+                Free(duplicatedPath);
+                return rc;
+            }
+            // void *buffer = _Malloc(SECTOR_SIZE);
             int blockNum = inode->extents[i].start_block;
-            Block_Read(mountPoint->dev, inode->extents[i].start_block, buffer);
+            // Block_Read(mountPoint->dev, inode->extents[i].start_block, buffer);
 
             // void *startAddr = buffer;
-            dirent = (struct gfs3_dirent *)buffer;
+            dirent = (struct gfs3_dirent *)buffer->data;
 
-            Print("blockNum - inode->extents[i].start_block: %d\n", blockNum - inode->extents[i].start_block);
+            // Print("blockNum - inode->extents[i].start_block: %d\n", blockNum - inode->extents[i].start_block);
             for (; blockNum - inode->extents[i].start_block < inode->extents[i].length_blocks;) {
-                Print("dirent->name: %s\n", dirent->name);
-                Print("dirent->name_length: %d\n", dirent->name_length);
+                // Print("dirent->name: %s\n", dirent->name);
+                // Print("dirent->name_length: %d\n", dirent->name_length);
                 // Print("dirent: %d\n", (char *)dirent);
                 // Print("dirent->inum: %d\n", dirent->inum);
                 if (dirent->inum != 0) {
                     if (strncmp(dirent->name, name, strlen(name)) == 0 && dirent->name_length == strlen(name)) {
-                        Print("found\n");
+                        // Print("found\n");
                         inodenum = dirent->inum;
                         found = true;
                         break;
@@ -532,15 +536,17 @@ static int GFS3_Open_Directory(struct Mount_Point *mountPoint,
                 } 
                 else {
                     blockNum++;
-                    Block_Read(mountPoint->dev, blockNum, buffer);
-                    // int rc = Get_FS_Buffer(instance->cache, inode->extents[i].start_block, &buffer);
-                    // if (rc != 0) {
-                    //     Free(duplicatedPath);
-                    //     return rc;
-                    // }
-                    dirent = (struct gfs3_dirent *)buffer;
+                    // Block_Read(mountPoint->dev, blockNum, buffer);
+                    Release_FS_Buffer(instance->cache, buffer);
+                    int rc = Get_FS_Buffer(instance->cache, inode->extents[i].start_block, &buffer);
+                    if (rc != 0) {
+                        Free(duplicatedPath);
+                        return rc;
+                    }
+                    dirent = (struct gfs3_dirent *)buffer->data;
                 }
             }
+            Release_FS_Buffer(instance->cache, buffer);
         }
 
         if (!found) {
@@ -589,7 +595,7 @@ static int GFS3_Delete(struct Mount_Point *mountPoint, const char *path,
 static int GFS3_Stat(struct Mount_Point *mountPoint, const char *path,
                      struct VFS_File_Stat *stat) {
     // TODO_P(PROJECT_GFS3, "GeekOS filesystem stat operation");
-    Print("GFS3_Stat\n");
+    // Print("GFS3_Stat\n");
     struct gfs3_instance *instance = (struct gfs3_instance *)mountPoint->fsData;
     struct gfs3_inode *inode = getInode(instance, GFS3_INUM_ROOT);
     gfs3_inodenum inodenum = GFS3_INUM_ROOT;
@@ -619,26 +625,26 @@ static int GFS3_Stat(struct Mount_Point *mountPoint, const char *path,
         for (i = 0; i < GFS3_EXTENTS; i++) {
             if (inode->extents[i].start_block == 0) continue;
 
-            // struct FS_Buffer *buffer = NULL;
-            // int rc = Get_FS_Buffer(instance->cache, inode->extents[i].start_block, &buffer);
-            // if (rc != 0) {
-            //     return rc;
-            // }
-            void *buffer = _Malloc(SECTOR_SIZE);
+            struct FS_Buffer *buffer = NULL;
+            int rc = Get_FS_Buffer(instance->cache, inode->extents[i].start_block, &buffer);
+            if (rc != 0) {
+                return rc;
+            }
+            // void *buffer = _Malloc(SECTOR_SIZE);
             int blockNum = inode->extents[i].start_block;
-            Block_Read(mountPoint->dev, inode->extents[i].start_block, buffer);
+            // Block_Read(mountPoint->dev, inode->extents[i].start_block, buffer);
 
-            dirent = (struct gfs3_dirent *)((char *)buffer);
+            dirent = (struct gfs3_dirent *)((char *)buffer->data);
 
             for (; blockNum - inode->extents[i].start_block < inode->extents[i].length_blocks;) {
-                Print("dirent->name: %s\n", dirent->name);
-                Print("dirent->name_length: %d\n", dirent->name_length);
+                // Print("dirent->name: %s\n", dirent->name);
+                // Print("dirent->name_length: %d\n", dirent->name_length);
                 // Print("dirent: %d\n", (char *)dirent);
                 // Print("dirent->inum: %d\n", dirent->inum);
                 if (dirent->inum != 0) {
-                    Print("dirent->name: %s\n", dirent->name);
+                    // Print("dirent->name: %s\n", dirent->name);
                     if (strncmp(dirent->name, name, strlen(name)) == 0 && dirent->name_length == strlen(name)) {
-                        Print("found\n");
+                        // Print("found\n");
                         inodenum = dirent->inum;
                         found = true;
                         break;
@@ -652,15 +658,17 @@ static int GFS3_Stat(struct Mount_Point *mountPoint, const char *path,
                 } 
                 else {
                     blockNum++;
-                    Block_Read(mountPoint->dev, blockNum, buffer);
-                    // int rc = Get_FS_Buffer(instance->cache, inode->extents[i].start_block, &buffer);
-                    // if (rc != 0) {
-                    //     Free(duplicatedPath);
-                    //     return rc;
-                    // }
+                    // Block_Read(mountPoint->dev, blockNum, buffer);
+                    Release_FS_Buffer(instance->cache, buffer);
+                    int rc = Get_FS_Buffer(instance->cache, inode->extents[i].start_block, &buffer);
+                    if (rc != 0) {
+                        Free(duplicatedPath);
+                        return rc;
+                    }
                     dirent = (struct gfs3_dirent *)buffer;
                 }
             }
+            Release_FS_Buffer(instance->cache, buffer);
         }
 
         if (!found) {
@@ -702,7 +710,7 @@ static int GFS3_Disk_Properties(struct Mount_Point *mountPoint,
                                 unsigned int *blocks_in_disk) {
     // TODO_P(PROJECT_GFS3,
     //        "GeekOS filesystem infomation operation; set variables.");
-    Print("GFS3_Disk_Properties\n");
+    // Print("GFS3_Disk_Properties\n");
     struct gfs3_instance *instance = (struct gfs3_instance *)mountPoint->fsData;
     *block_size = instance->sb->blocks_per_disk;
     *blocks_in_disk = instance->sb->number_of_inodes;
@@ -734,7 +742,7 @@ static int GFS3_Format(struct Block_Device *blockDev
 
 static int GFS3_Mount(struct Mount_Point *mountPoint) {
     // TODO_P(PROJECT_GFS3, "GeekOS filesystem mount operation");
-    Print("GFS3_Mount\n");
+    // Print("GFS3_Mount\n");
     struct gfs3_superblock *sb = _Malloc(sizeof(struct gfs3_superblock));
     void *buffer = _Malloc(SECTOR_SIZE);
 

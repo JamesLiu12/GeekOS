@@ -21,33 +21,59 @@ Registering paging device: /c/pagefile.bin on ide0 with 10240 sectors
 Mounted /c filesystem!
 Welcome to GeekOS!
 Spawning init process (/c/shell.exe)
+$ gfs3tst `[25;11f16
+Task index is 16.
+Invoking preliminary mount
+Mount returned 0.
+preliminary mount apparently successful
+Retrieved disk parameters, blocksize 20480, blocks 2048
+Testing: Basic Seek...Sys_Seek
+Sys_Seek
+PASSED (1) crt score: 2 
 $ gfs3tst 16
 Task index is 16.
 Invoking preliminary mount
-GFS3_Mount
-Mount returned 0.
+Open_Block_Device: Unable to open ide1
+Mount returned -6.
+Sys_OpenDirectory
+perhaps already mounted
 preliminary mount apparently successful
-GFS3_Disk_Properties
 Retrieved disk parameters, blocksize 20480, blocks 2048
-Testing: Basic Seek...GFS3_Open
-blockNum - inode->extents[i].start_block: 0
-dirent->name: .
-dirent->name_length: 1
-dirent->name: ..
-dirent->name_length: 2
-dirent->name: somefile
-dirent->name_length: 8
-dirent->name: somedir
-dirent->name_length: 7
-dirent->name: basic
-dirent->name_length: 5
-dirent->name: basic7f
-dirent->name_length: 7
-found
+Testing: Basic Seek...Sys_Seek
 Sys_Seek
-GFS3_Seek
-Sys_Seek
-GFS3_Seek
-GFS3_Close
 PASSED (1) crt score: 2 
+$ gfs3tst 27
+Task index is 27.
+Invoking preliminary mount
+Open_Block_Device: Unable to open ide1
+Mount returned -6.
+Sys_OpenDirectory
+perhaps already mounted
+preliminary mount apparently successful
+Retrieved disk parameters, blocksize 20480, blocks 2048
+Testing: Read Entry...Sys_OpenDirectory
+Sys_ReadEntry
+Sys_ReadEntry
+Sys_ReadEntry
+Sys_ReadEntry
+Sys_ReadEntry
+Sys_OpenDirectory
+PASSED (1) crt score: 4 
+$ gfs3tst 27
+Task index is 27.
+Invoking preliminary mount
+Open_Block_Device: Unable to open ide1
+Mount returned -6.
+Sys_OpenDirectory
+perhaps already mounted
+preliminary mount apparently successful
+Retrieved disk parameters, blocksize 20480, blocks 2048
+Testing: Read Entry...Sys_OpenDirectory
+Sys_ReadEntry
+Sys_ReadEntry
+Sys_ReadEntry
+Sys_ReadEntry
+Sys_ReadEntry
+Sys_OpenDirectory
+PASSED (1) crt score: 4 
 $ 
