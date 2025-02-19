@@ -246,7 +246,7 @@ static int Sys_Spawn(struct Interrupt_State *state) {
 
     /* Copy program name and command from user space. */
     if((rc =
-        Copy_User_String(state->ebx, state->ecx, VFS_MAX_PATH_LEN,
+        Copy_User_String(state->ebx, state->ecx, VFS_MAX_LEN,
                          &program)) != 0 ||
        (rc =
         Copy_User_String(state->edx, state->esi, 1023, &command)) != 0)
@@ -512,6 +512,7 @@ static int add_file_to_descriptor_table(struct File *file) {
  *   or an error code (< 0) if unsuccessful
  */
 static int Sys_Open(struct Interrupt_State *state) {
+    // Print("Sys_Open\n");
     char *path;
     struct File *file;
     int rc = 0;
@@ -548,7 +549,7 @@ static int Sys_Open(struct Interrupt_State *state) {
  *   or an error code (< 0) if unsuccessful
  */
 static int Sys_OpenDirectory(struct Interrupt_State *state) {
-    Print("Sys_OpenDirectory\n");
+    // Print("Sys_OpenDirectory\n");
     // TODO_P(PROJECT_FS, "Open directory system call");
 
     char *path;
@@ -600,8 +601,14 @@ static int Sys_Close(struct Interrupt_State *state) {
  * Returns: 0 if successful, error code (< 0) if unsuccessful
  */
 static int Sys_Delete(struct Interrupt_State *state) {
-    TODO_P(PROJECT_FS, "Delete system call");
-    return EUNSUPPORTED;
+    // TODO_P(PROJECT_FS, "Delete system call");
+    char *path;
+    int rc = get_path_from_registers(state->ebx, state->ecx, &path);
+    if(rc != 0) return rc;
+    rc = Delete(path, state->edx);
+    Free(path);
+    return rc;
+    // return EUNSUPPORTED;
 }
 
 /*
@@ -660,6 +667,7 @@ static int Sys_SymLink(struct Interrupt_State *state) {
  *   or error code (< 0) on error
  */
 static int Sys_Read(struct Interrupt_State *state) {
+    // Print("Sys_Read\n");
     int bytes_read = 0;
 
     if(state->ebx >= USER_MAX_FILES) {
@@ -695,7 +703,7 @@ static int Sys_Read(struct Interrupt_State *state) {
  * Returns: 0 if successful, error code (< 0) if unsuccessful
  */
 static int Sys_ReadEntry(struct Interrupt_State *state) {
-    Print("Sys_ReadEntry\n");
+    // Print("Sys_ReadEntry\n");
     // TODO_P(PROJECT_FS, "ReadEntry system call");
     if(state->ebx > USER_MAX_FILES) return EINVALID;
 
@@ -732,6 +740,7 @@ static int Sys_ReadEntry(struct Interrupt_State *state) {
  *   or error code (< 0) on error
  */
 static int Sys_Write(struct Interrupt_State *state) {
+    // Print("Sys_Write\n");
     int bytes_written = 0;
 
     if(state->ebx >= USER_MAX_FILES) {
@@ -767,7 +776,7 @@ static int Sys_Write(struct Interrupt_State *state) {
  * Returns: 0 if successful, error code (< 0) if unsuccessful
  */
 static int Sys_Stat(struct Interrupt_State *state) {
-    Print("Sys_Stat\n");
+    // Print("Sys_Stat\n");
     // TODO_P(PROJECT_FS, "Stat system call");
     char *path;
     int rc = get_path_from_registers(state->ebx, state->ecx, &path);
@@ -788,7 +797,7 @@ static int Sys_Stat(struct Interrupt_State *state) {
  * Returns: 0 if successful, error code (< 0) if unsuccessful
  */
 static int Sys_FStat(struct Interrupt_State *state) {
-    Print("Sys_FStat\n");
+    // Print("Sys_FStat\n");
     // TODO_P(PROJECT_FS, "FStat system call");
     if(state->ebx > USER_MAX_FILES) return EINVALID;
     
@@ -811,7 +820,7 @@ static int Sys_FStat(struct Interrupt_State *state) {
  * Returns: 0 if successful, error code (< 0) if unsuccessful
  */
 static int Sys_Seek(struct Interrupt_State *state) {
-    Print("Sys_Seek\n");
+    // Print("Sys_Seek\n");
     // TODO_P(PROJECT_FS, "Seek system call");
     if(state->ebx > USER_MAX_FILES) return EINVALID;
 
@@ -829,8 +838,15 @@ static int Sys_Seek(struct Interrupt_State *state) {
  * Returns: 0 if successful, error code (< 0) if unsuccessful
  */
 static int Sys_CreateDir(struct Interrupt_State *state) {
-    TODO_P(PROJECT_FS, "CreateDir system call");
-    return EUNSUPPORTED;
+    // TODO_P(PROJECT_FS, "CreateDir system call");
+    // Print("Sys_CreateDir\n");
+    char *path;
+    int rc = get_path_from_registers(state->ebx, state->ecx, &path);
+    if(rc != 0) return rc;
+    rc = Create_Directory(path);
+    Free(path);
+    return rc;
+    // return EUNSUPPORTED;
 }
 
 /*
@@ -839,9 +855,10 @@ static int Sys_CreateDir(struct Interrupt_State *state) {
  * Returns: 0 if successful, error code (< 0) if unsuccessful
  */
 static int Sys_Sync(struct Interrupt_State *state) {
-    TODO_P(PROJECT_FS, "Sync system call");
+    // TODO_P(PROJECT_FS, "Sync system call");
     (void)state;                /* unused */
-    return EUNSUPPORTED;
+    return Sync();
+    // return EUNSUPPORTED;
 }
 
 /*

@@ -732,8 +732,10 @@ int tBasicDelete() {
     }
 
     retD = Delete("/d/basic5f", false);
+    Print("Delete returned %d\n", retD);
 
     retS = Stat("/d/basic5f", &s);
+    Print("Stat returned %d\n", retS);
 
     return (retD >= 0 && retS < 0) ? 1 : -1;
 }
@@ -830,6 +832,7 @@ int tDeleteNonEmptyDirectory() {
     }
 
     retD = Delete("/d/dir4d", false);
+    Print("Delete returned %d\n", retD);
 
     (void)Delete("/d/dir4d/file", false);
     (void)Delete("/d/dir4d", false);
@@ -971,13 +974,16 @@ int tWriteReread(unsigned int howManyKBs, char const *fileName,
                 break;
             }
 
+            // Print("%d\n", buffer2[0]);
             if((unsigned char)buffer2[0] != (unsigned char)(i % 256)) {
-                Print("mismatched ident %d != %d", buffer2[0], i % 256);
+                Print("mismatched ident %d != %d\n", buffer2[0], i % 256);
                 ret = -1;
-                break;
+                // break;
             }
             for(j = 1; j < 100; j++) {
+                // Print("%d ", buffer2[j]);
                 if(buffer2[j] != j) {
+                    Print("mismatched data %d != %d\n", buffer2[j], j);
                     ret = -1;
                     break;
                 }
@@ -997,6 +1003,7 @@ int tWriteReread(unsigned int howManyKBs, char const *fileName,
         (void)Delete(fileName, false);
     }
 
+    Print("ret=%d\n", ret);
     return ret;
 }
 
@@ -1045,6 +1052,7 @@ int tBigDir() {
         }
         retS = Stat(fname, &s);
         if(retS < 0) {
+            Print("retS: %d\n", retS);
             Print("bad stat at %d\n", fi);
             return -1;
         }
@@ -1064,6 +1072,7 @@ int tBigDir() {
         Print((fi % 25 == 0) ? ":" : ".");
         (void)Delete(fname, false);
         retS = Stat(fname, &s);
+        Print("retS: %d\n", retS);
         if(retS == 0) {
             return -1;
         }
@@ -1260,6 +1269,7 @@ int tClean() {
     Delete("/d/hello", false);  /* if in there */
 
     fd = Open_Directory("/d");
+    Print("fd: %d\n", fd);
     for(i = 0; (retR = Read_Entry(fd, &dirEntry)) == 0 &&
         (dirEntry.name[0] == '.' ||
          strcmp("somedir", dirEntry.name) == 0 ||
@@ -1268,6 +1278,8 @@ int tClean() {
          strcmp("basic7f", dirEntry.name) == 0 ||
          strcmp("basic11d", dirEntry.name) == 0 ||
          strcmp("recursive_stat1", dirEntry.name) == 0); i++) ;
+    Print("i: %u\n", i);
+    Print("dirEntry.name: %s\n", dirEntry.name);
 
     //  if(dirEntry.name[0] != '.') {
     // Print("non-dot entry %s\n", dirEntry.name);

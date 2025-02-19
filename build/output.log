@@ -1,7 +1,7 @@
-BSS = 4e888
+BSS = 50888
 start kern info = 90000
 Creating kernel heap: start=102000, size=1048576
-527232KB memory detected, 130360 pages in freelist, 1048576 bytes in kernel heap
+527232KB memory detected, 130358 pages in freelist, 1048576 bytes in kernel heap
 Initializing IDT...
 Init_SMP
 Initializing SMP...
@@ -21,59 +21,216 @@ Registering paging device: /c/pagefile.bin on ide0 with 10240 sectors
 Mounted /c filesystem!
 Welcome to GeekOS!
 Spawning init process (/c/shell.exe)
-$ gfs3tst `[25;11f16
-Task index is 16.
+$ h[25;3fgfs3tst 32
+Task index is 32.
 Invoking preliminary mount
 Mount returned 0.
 preliminary mount apparently successful
 Retrieved disk parameters, blocksize 20480, blocks 2048
-Testing: Basic Seek...Sys_Seek
+Testing: House Is Clean...prep 0
+Sys_Open
+Create file
+directoryInode->size: 132
+add new extent: 0
+ 50
+Sys_Stat
+Sys_Open
+ 50delete file
+parentInode->size: 116
+inodenum: 15
+file deleted
+ret=1
+prep 1
+Sys_Open
+Create file
+directoryInode->size: 132
 Sys_Seek
-PASSED (1) crt score: 2 
-$ gfs3tst 16
-Task index is 16.
-Invoking preliminary mount
-Open_Block_Device: Unable to open ide1
-Mount returned -6.
-Sys_OpenDirectory
-perhaps already mounted
-preliminary mount apparently successful
-Retrieved disk parameters, blocksize 20480, blocks 2048
-Testing: Basic Seek...Sys_Seek
+add new extent: 0
+add new extent: 1
+add new extent: 2
 Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+ 50Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+Sys_Seek
+
+Sys_Stat
+Sys_Open
+ 50delete file
+parentInode->size: 116
+inodenum: 15
+file deleted
+ret=1
+prep 2
+Sys_Stat
+Sys_Stat
+Sys_Stat
+Sys_Stat
+Sys_Stat
+Sys_Stat
+Sys_Stat
+Sys_Stat
+Sys_Stat
+Sys_Stat
+Sys_Stat
+Sys_Stat
+prep 3
+Sys_Open
+Create file
+directoryInode->size: 132
+delete file
+parentInode->size: 116
+inodenum: 15
+file deleted
+prep 4
+Sys_Open
+Create file
+directoryInode->size: 156
+delete file
+parentInode->size: 116
+inodenum: 15
+file deleted
+prep 5
+Sys_CreateDir
+Create directory
+Sys_CreateDir
+Create directory
+add new extent: 0
+inode->size: 0
+inode->size: 0
+prep 6
+Sys_CreateDir
+Create directory
+Sys_CreateDir
+Create directory
+add new extent: 0
+Sys_Open
+Create file
+add new extent: 0
+directoryInode->size: 12
+delete file
+parentInode->size: 0
+inodenum: 18
+file deleted
+inode->size: 0
+inode->size: 0
+ENOTFOUND
+Sys_OpenDirectory
+open root
+fd: 0
+Sys_ReadEntry
+GFS3_Read_Entry
+Sys_ReadEntry
+GFS3_Read_Entry
+Sys_ReadEntry
+GFS3_Read_Entry
+Sys_ReadEntry
+GFS3_Read_Entry
+Sys_ReadEntry
+GFS3_Read_Entry
+Sys_ReadEntry
+GFS3_Read_Entry
+Sys_ReadEntry
+GFS3_Read_Entry
+Sys_ReadEntry
+GFS3_Read_Entry
+Sys_ReadEntry
+GFS3_Read_Entry
+i: 8
+dirEntry.name: recursive_stat1
 PASSED (1) crt score: 2 
-$ gfs3tst 27
-Task index is 27.
-Invoking preliminary mount
-Open_Block_Device: Unable to open ide1
-Mount returned -6.
-Sys_OpenDirectory
-perhaps already mounted
-preliminary mount apparently successful
-Retrieved disk parameters, blocksize 20480, blocks 2048
-Testing: Read Entry...Sys_OpenDirectory
-Sys_ReadEntry
-Sys_ReadEntry
-Sys_ReadEntry
-Sys_ReadEntry
-Sys_ReadEntry
-Sys_OpenDirectory
-PASSED (1) crt score: 4 
-$ gfs3tst 27
-Task index is 27.
-Invoking preliminary mount
-Open_Block_Device: Unable to open ide1
-Mount returned -6.
-Sys_OpenDirectory
-perhaps already mounted
-preliminary mount apparently successful
-Retrieved disk parameters, blocksize 20480, blocks 2048
-Testing: Read Entry...Sys_OpenDirectory
-Sys_ReadEntry
-Sys_ReadEntry
-Sys_ReadEntry
-Sys_ReadEntry
-Sys_ReadEntry
-Sys_OpenDirectory
-PASSED (1) crt score: 4 
 $ 

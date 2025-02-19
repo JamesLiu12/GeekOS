@@ -22,7 +22,7 @@
 #include <geekos/ktypes.h>
 
 /* Maximum name of a path. */
-#define VFS_MAX_PATH_LEN 1023
+#define VFS_MAX_LEN 1023
 
 /* Maximum length of the name of a filesystem type: e.g., "pfat", "gosfs", etc. */
 #define VFS_MAX_FS_NAME_LEN 15
@@ -90,7 +90,7 @@ struct VFS_Dir_Entry {
  */
 struct VFS_Mount_Request {
     char devname[BLOCKDEV_MAX_NAME_LEN + 1];    /* Name of block device: e.g., "ide1". */
-    char prefix[VFS_MAX_PATH_LEN + 1];  /* Directory prefix to mount on: e.g., "/d". */
+    char prefix[VFS_MAX_LEN + 1];  /* Directory prefix to mount on: e.g., "/d". */
     char fstype[VFS_MAX_FS_NAME_LEN + 1];       /* Filesystem type: e.g., "gosfs". */
 };
 

@@ -24,6 +24,7 @@ typedef unsigned int gfs3_inodenum;     /* For inode numbers */
 /* ==Constants== */
 #define GFS3_DIRECTORY 1
 #define GFS3_FILE 2
+#define GFS3_EMPTY_DIRECTORY 3
 
 #define GFS3_MAGIC 0x47465333
 
